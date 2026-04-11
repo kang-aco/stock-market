@@ -1,0 +1,128 @@
+/* 1. 스파크라인 canvas 기본 크기 */
+.sparkline-canvas {
+  height: 40px;
+  width: 100%;
+  display: block;
+}
+
+/* 2. 정렬 가능한 th hover 스타일 */
+th.sortable {
+  user-select: none;
+  position: relative;
+}
+
+th.sortable:hover {
+  background-color: rgba(148, 163, 184, 0.08);
+}
+
+th.sortable.active {
+  color: #f1f5f9;
+}
+
+/* 3. 스피너 animation */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* 4. 토스트 fade in/out transition */
+.toast {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast.hidden {
+  display: none;
+}
+
+.toast-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+/* 5. 가로 스크롤바 숨기기 */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 6. pre-wrap 텍스트 스타일 */
+.report-text {
+  white-space: pre-wrap;
+  line-height: 1.8;
+  word-break: break-word;
+}
+
+/* 7. 장 상태 뱃지 점멸 (개장중) */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.blink {
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+/* 지수 카드 기본 스타일 */
+.index-card {
+  min-width: 180px;
+  background-color: #1e293b;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+
+.index-card:hover {
+  background-color: #263348;
+}
+
+/* 환율/유가 카드 */
+.fx-oil-card {
+  background-color: #1e293b;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  transition: background-color 0.15s ease;
+}
+
+.fx-oil-card:hover {
+  background-color: #263348;
+}
+
+/* 종목 테이블 행 */
+#stocks-tbody tr {
+  border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+  transition: background-color 0.1s ease;
+}
+
+#stocks-tbody tr:last-child {
+  border-bottom: none;
+}
+
+#stocks-tbody tr:hover {
+  background-color: rgba(148, 163, 184, 0.05);
+}
+
+/* 색상 유틸 */
+.text-rise {
+  color: #22c55e;
+}
+
+.text-fall {
+  color: #ef4444;
+}
+
+.text-flat {
+  color: #94a3b8;
+}
