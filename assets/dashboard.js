@@ -205,19 +205,25 @@ function renderStocksTable(stocks) {
   tbody.innerHTML = '';
 
   if (!stocks || stocks.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-500">데이터 없음</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-500">데이터 없음</td></tr>';
     return;
   }
 
   stocks.forEach((stock) => {
-    const rateCls = colorClass(stock.changeRate);
-    const rateText = formatChangeRate(stock.changeRate);
+    const rateCls    = colorClass(stock.changeRate);
+    const changeCls  = colorClass(stock.change);
+    const rateText   = formatChangeRate(stock.changeRate);
+    const changeText = formatChange(stock.change);
+    const ratioText  = stock.ratio != null ? `${stock.ratio.toFixed(2)}%` : '—';
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="px-4 py-3 font-medium text-[#f1f5f9]">${stock.name}</td>
-      <td class="px-4 py-3 text-right font-mono">${stock.price.toLocaleString('ko-KR')}원</td>
+      <td class="px-4 py-3 text-right font-mono">${stock.price != null ? stock.price.toLocaleString('ko-KR') + '원' : 'N/A'}</td>
+      <td class="px-4 py-3 text-right font-mono ${changeCls}">${changeText}</td>
       <td class="px-4 py-3 text-right font-mono ${rateCls}">${rateText}</td>
-      <td class="px-4 py-3 text-right font-mono text-slate-300">${stock.volume.toLocaleString('ko-KR')}</td>
+      <td class="px-4 py-3 text-right font-mono text-slate-300">${stock.volume != null ? stock.volume.toLocaleString('ko-KR') : 'N/A'}</td>
+      <td class="px-4 py-3 text-right font-mono text-blue-300">${ratioText}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -241,9 +247,12 @@ function initStockSorting() {
 
       const sorted = [...currentStocks].sort((a, b) => {
         let va, vb;
-        if (col === 'price') { va = a.price; vb = b.price; }
+        if      (col === 'price')      { va = a.price;      vb = b.price;      }
+        else if (col === 'change')     { va = a.change;     vb = b.change;     }
         else if (col === 'changeRate') { va = a.changeRate; vb = b.changeRate; }
-        else { va = a.volume; vb = b.volume; }
+        else if (col === 'volume')     { va = a.volume;     vb = b.volume;     }
+        else if (col === 'ratio')      { va = a.ratio;      vb = b.ratio;      }
+        else { va = 0; vb = 0; }
         return stockSortState.asc ? va - vb : vb - va;
       });
 
