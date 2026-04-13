@@ -19,17 +19,18 @@ const INDEX_TICKERS = [
   { ticker: "^SOX",   id: "SOX",        name: "필라델피아반도체", optional: false },
 ];
 
+// 편입비율(ratio)은 필승코리아 펀드 기준 참고값 (%)
 const STOCK_TICKERS = [
-  { ticker: "005930.KS", name: "삼성전자" },
-  { ticker: "000660.KS", name: "SK하이닉스" },
-  { ticker: "005380.KS", name: "현대차" },
-  { ticker: "000270.KS", name: "기아" },
-  { ticker: "373220.KS", name: "LG에너지솔루션" },
-  { ticker: "005490.KS", name: "POSCO홀딩스" },
-  { ticker: "068270.KS", name: "셀트리온" },
-  { ticker: "207940.KS", name: "삼성바이오로직스" },
-  { ticker: "105560.KS", name: "KB금융" },
-  { ticker: "055550.KS", name: "신한지주" },
+  { ticker: "005930.KS", name: "삼성전자",         ratio: 24.51 },
+  { ticker: "000660.KS", name: "SK하이닉스",       ratio:  7.83 },
+  { ticker: "005380.KS", name: "현대차",           ratio:  4.62 },
+  { ticker: "000270.KS", name: "기아",             ratio:  3.94 },
+  { ticker: "373220.KS", name: "LG에너지솔루션",   ratio:  3.41 },
+  { ticker: "005490.KS", name: "POSCO홀딩스",      ratio:  2.73 },
+  { ticker: "068270.KS", name: "셀트리온",         ratio:  2.58 },
+  { ticker: "207940.KS", name: "삼성바이오로직스", ratio:  2.47 },
+  { ticker: "105560.KS", name: "KB금융",           ratio:  2.12 },
+  { ticker: "055550.KS", name: "신한지주",         ratio:  1.89 },
 ];
 
 const FX_TICKERS = [
@@ -176,6 +177,7 @@ export async function onRequest(context) {
         return {
           id:         def.ticker,
           name:       def.name,
+          ratio:      def.ratio,
           price:      q.price,
           change:     q.change,
           changeRate: q.changeRate,
