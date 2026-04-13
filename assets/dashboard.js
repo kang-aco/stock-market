@@ -122,61 +122,7 @@ async function fetchInvestors() {
   }
 }
 
-// ── 4. fetchReports ───────────────────────────────────────────────────────
-// 수정: 브리핑 먼저 로드 후 즉시 표시 → 예측 보고서는 브리핑을 POST로 전달받아 생성
-// 기존 병렬 호출 방식은 prediction이 내부에서 briefing을 재호출해 Cloudflare 타임아웃 발생
-
-function textToHtml(text) {
-  if (!text) return '';
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
-}
-
-async function fetchReports() {
-  // 스피너 표시
-  document.getElementById('briefing-spinner').classList.remove('hidden');
-  document.getElementById('briefing-content').classList.add('hidden');
-  document.getElementById('prediction-spinner').classList.remove('hidden');
-  document.getElementById('prediction-content').classList.add('hidden');
-
-  let briefingText = '';
-
-  // Step 1: 브리핑 로드 (캐시 적용 — 첫 호출 후 1시간 동안 즉시 반환)
-  try {
-    const briefingRes = await fetch('/api/briefing');
-    if (!briefingRes.ok) throw new Error(`HTTP ${briefingRes.status}`);
-    const briefing = await briefingRes.json();
-    briefingText = briefing.report || '';
-    document.getElementById('briefing-content').innerHTML = textToHtml(briefingText);
-  } catch (err) {
-    console.error('[fetchReports] briefing:', err);
-    document.getElementById('briefing-content').innerHTML = '<span class="text-slate-500">브리핑을 불러오지 못했습니다.</span>';
-    showToast('브리핑 생성 실패');
-  } finally {
-    document.getElementById('briefing-spinner').classList.add('hidden');
-    document.getElementById('briefing-content').classList.remove('hidden');
-  }
-
-  // Step 2: 예측 보고서 로드 (브리핑 텍스트를 POST로 전달 — 내부 재호출 없음)
-  try {
-    const predictionRes = await fetch('/api/prediction', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ briefing: briefingText }),
-    });
-    if (!predictionRes.ok) throw new Error(`HTTP ${predictionRes.status}`);
-    const prediction = await predictionRes.json();
-    document.getElementById('prediction-content').innerHTML = textToHtml(prediction.prediction || '');
-  } catch (err) {
-    console.error('[fetchReports] prediction:', err);
-    document.getElementById('prediction-content').innerHTML = '<span class="text-slate-500">예측 보고서를 불러오지 못했습니다.</span>';
-    showToast('예측 보고서 생성 실패');
-  } finally {
-    document.getElementById('prediction-spinner').classList.add('hidden');
-    document.getElementById('prediction-content').classList.remove('hidden');
-  }
-}
-
-// ── 5. renderIndices ──────────────────────────────────────────────────────
+// ── 4. renderIndices ──────────────────────────────────────────────────────
 
 function createSparkline(canvasEl, sparkline, change) {
   const color = (change === null || change === undefined || change >= 0) ? '#22c55e' : '#ef4444';
@@ -247,7 +193,7 @@ function renderIndices(indices) {
   });
 }
 
-// ── 6. renderStocks ───────────────────────────────────────────────────────
+// ── 5. renderStocks ───────────────────────────────────────────────────────
 
 function renderStocks(stocks) {
   currentStocks = stocks || [];
@@ -277,7 +223,7 @@ function renderStocksTable(stocks) {
   });
 }
 
-// ── 7. 종목 테이블 정렬 ───────────────────────────────────────────────────
+// ── 6. 종목 테이블 정렬 ───────────────────────────────────────────────────
 
 function initStockSorting() {
   document.querySelectorAll('.sortable').forEach((th) => {
@@ -306,7 +252,7 @@ function initStockSorting() {
   });
 }
 
-// ── 8. renderFxOil ────────────────────────────────────────────────────────
+// ── 7. renderFxOil ────────────────────────────────────────────────────────
 
 function renderFxOil(fx, oil) {
   const container = document.getElementById('fx-oil-container');
@@ -354,7 +300,7 @@ function renderFxOil(fx, oil) {
   });
 }
 
-// ── 9. renderInvestorCharts ───────────────────────────────────────────────
+// ── 8. renderInvestorCharts ───────────────────────────────────────────────
 
 function renderInvestorCharts(data) {
   const markets = [
@@ -420,38 +366,16 @@ function renderInvestorCharts(data) {
   });
 }
 
-// ── 10 & 11. 보고서 버튼 ─────────────────────────────────────────────────
-
-function initReportButtons() {
-  document.getElementById('copy-briefing').addEventListener('click', () => {
-    const text = document.getElementById('briefing-content').innerText;
-    navigator.clipboard.writeText(text)
-      .then(() => showToast('브리핑 보고서가 복사되었습니다'))
-      .catch(() => showToast('복사에 실패했습니다'));
-  });
-
-  document.getElementById('copy-prediction').addEventListener('click', () => {
-    const text = document.getElementById('prediction-content').innerText;
-    navigator.clipboard.writeText(text)
-      .then(() => showToast('예측 보고서가 복사되었습니다'))
-      .catch(() => showToast('복사에 실패했습니다'));
-  });
-
-  document.getElementById('refresh-reports').addEventListener('click', fetchReports);
-}
-
-// ── 14. 초기화 ────────────────────────────────────────────────────────────
+// ── 9. 초기화 ────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   updateClock();
   setInterval(updateClock, 1000);
 
   initStockSorting();
-  initReportButtons();
 
   fetchMarket();
   fetchInvestors();
-  fetchReports();
 
   setInterval(fetchMarket, 30000);
   setInterval(fetchInvestors, 30000);
