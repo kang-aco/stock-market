@@ -24,7 +24,6 @@
   <section class="px-6 py-4">
     <h2 class="text-base font-semibold text-slate-300 mb-3">주요 지수</h2>
     <div id="indices-container" class="flex gap-4 overflow-x-auto pb-2 hide-scrollbar">
-      <!-- 카드가 JS로 렌더링됨 -->
     </div>
   </section>
 
@@ -37,13 +36,15 @@
           <tr class="border-b border-slate-700 text-slate-400">
             <th class="text-left px-4 py-3 font-medium">종목명</th>
             <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="price">현재가</th>
+            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="change">등락가격</th>
             <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="changeRate">등락률 ▲▼</th>
             <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="volume">거래량</th>
+            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="ratio">편입비율</th>
           </tr>
         </thead>
         <tbody id="stocks-tbody">
           <tr>
-            <td colspan="4" class="text-center py-8 text-slate-500">데이터 불러오는 중...</td>
+            <td colspan="6" class="text-center py-8 text-slate-500">데이터 불러오는 중...</td>
           </tr>
         </tbody>
       </table>
@@ -54,7 +55,6 @@
   <section class="px-6 py-4">
     <h2 class="text-base font-semibold text-slate-300 mb-3">환율 및 유가</h2>
     <div id="fx-oil-container" class="grid grid-cols-2 md:grid-cols-5 gap-4">
-      <!-- 카드가 JS로 렌더링됨 -->
     </div>
   </section>
 
@@ -62,14 +62,12 @@
   <section class="px-6 py-4 pb-8">
     <h2 class="text-base font-semibold text-slate-300 mb-3">투자자별 거래금액</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <!-- 코스피 -->
       <div class="bg-[#1e293b] rounded-xl p-4">
         <h3 class="text-sm font-semibold text-slate-400 mb-3">코스피 <span class="text-xs text-slate-500">(단위: 억원)</span></h3>
         <div class="relative h-40">
           <canvas id="kospi-investor-chart"></canvas>
         </div>
       </div>
-      <!-- 코스닥 -->
       <div class="bg-[#1e293b] rounded-xl p-4">
         <h3 class="text-sm font-semibold text-slate-400 mb-3">코스닥 <span class="text-xs text-slate-500">(단위: 억원)</span></h3>
         <div class="relative h-40">
