@@ -1,97 +1,85 @@
 'use strict';
 
-// ── 전역 상태 ──────────────────────────────────────────────────────────────
-let marketData = null;
+let marketData    = null;
 let investorsData = null;
 let sparklineCharts = {};
-let investorCharts = {};
-let stockSortState = { col: null, asc: true };
-let currentStocks = [];
+let investorCharts  = {};
+let stockSortState  = { col: null, asc: true };
+let currentStocks   = [];
 
-// ── 유틸 ──────────────────────────────────────────────────────────────────
+// ── 유틸 ──────────────────────────────────────────────────────────────────────
 
-function formatTime(isoString) {
-  if (!isoString) return '—';
-  const d = new Date(isoString);
-  return d.toLocaleString('ko-KR', {
-    month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
+function formatTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('ko-KR', {
+    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
   });
 }
 
-function colorClass(value) {
-  if (value === null || value === undefined) return 'text-flat';
-  if (value > 0) return 'text-rise';
-  if (value < 0) return 'text-fall';
-  return 'text-flat';
+function colorClass(v) {
+  if (v == null) return 'text-flat';
+  return v > 0 ? 'text-rise' : v < 0 ? 'text-fall' : 'text-flat';
 }
 
-function directionIcon(value) {
-  if (value === null || value === undefined || value === 0) return '<span class="text-flat">━</span>';
-  if (value > 0) return '<span class="text-rise">▲</span>';
-  return '<span class="text-fall">▼</span>';
+function directionIcon(v) {
+  if (v == null || v === 0) return '<span class="text-flat">━</span>';
+  return v > 0 ? '<span class="text-rise">▲</span>' : '<span class="text-fall">▼</span>';
 }
 
-function formatChangeRate(rate) {
-  if (rate === null || rate === undefined) return 'N/A';
-  const sign = rate >= 0 ? '+' : '';
-  return `${sign}${rate.toFixed(2)}%`;
+function formatChangeRate(r) {
+  if (r == null) return 'N/A';
+  return `${r >= 0 ? '+' : ''}${r.toFixed(2)}%`;
 }
 
-function formatChange(change) {
-  if (change === null || change === undefined) return 'N/A';
-  const abs = Math.abs(change).toFixed(2);
-  if (change > 0) return `<span class="text-rise">▲${abs}</span>`;
-  if (change < 0) return `<span class="text-fall">▼${abs}</span>`;
-  return `<span class="text-flat">━${abs}</span>`;
+function formatChange(c) {
+  if (c == null) return 'N/A';
+  const a = Math.abs(c).toFixed(2);
+  if (c > 0) return `<span class="text-rise">▲${a}</span>`;
+  if (c < 0) return `<span class="text-fall">▼${a}</span>`;
+  return `<span class="text-flat">━${a}</span>`;
 }
 
-/**
- * 등락가격 포맷 (원화 단위, 콤마 적용)
- * +1,500 / -500 형태로 표시
- */
-function formatChangePrice(change) {
-  if (change === null || change === undefined) return '<span class="text-flat">—</span>';
-  const abs = Math.abs(change).toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  if (change > 0) return `<span class="text-rise">+${abs}</span>`;
-  if (change < 0) return `<span class="text-fall">−${abs}</span>`;
+function formatChangePrice(c) {
+  if (c == null) return '<span class="text-flat">—</span>';
+  const a = Math.abs(c).toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+  if (c > 0) return `<span class="text-rise">+${a}</span>`;
+  if (c < 0) return `<span class="text-fall">−${a}</span>`;
   return `<span class="text-flat">±0</span>`;
 }
 
-function showToast(message) {
-  const toast = document.getElementById('toast');
-  toast.textContent = message;
-  toast.classList.remove('hidden');
-  setTimeout(() => toast.classList.add('hidden'), 3000);
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 3000);
 }
 
-// ── 1. 시계 및 장 상태 뱃지 ─────────────────────────────────────────────────
+// ── 1. 시계 & 장 상태 ─────────────────────────────────────────────────────────
 
 function updateClock() {
-  const now = new Date();
-  document.getElementById('clock').textContent = now.toLocaleTimeString('ko-KR');
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('ko-KR');
 }
 
 function updateMarketStatusBadge(status) {
-  const badge = document.getElementById('market-status-badge');
-  badge.className = 'px-3 py-1 rounded-full font-semibold text-xs';
+  const b = document.getElementById('market-status-badge');
+  b.className = 'px-3 py-1 rounded-full font-semibold text-xs';
   if (status === 'OPEN') {
-    badge.textContent = '● 개장 중';
-    badge.classList.add('bg-green-900', 'text-green-300', 'blink');
+    b.textContent = '● 개장 중';
+    b.classList.add('bg-green-900', 'text-green-300', 'blink');
   } else if (status === 'PRE_MARKET') {
-    badge.textContent = '● 프리마켓';
-    badge.classList.add('bg-yellow-900', 'text-yellow-300');
+    b.textContent = '● 프리마켓';
+    b.classList.add('bg-yellow-900', 'text-yellow-300');
   } else {
-    badge.textContent = '● 장 마감';
-    badge.classList.add('bg-slate-700', 'text-slate-400');
+    b.textContent = '● 장 마감';
+    b.classList.add('bg-slate-700', 'text-slate-400');
   }
 }
 
-// ── 2. fetchMarket ────────────────────────────────────────────────────────
+// ── 2. fetchMarket ────────────────────────────────────────────────────────────
 
 async function fetchMarket() {
   try {
-    const res = await fetch('/api/market');
+    const res  = await fetch('/api/market');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     marketData = data;
@@ -106,27 +94,54 @@ async function fetchMarket() {
   }
 }
 
-// ── 3. fetchInvestors ─────────────────────────────────────────────────────
+// ── 3. fetchInvestors ─────────────────────────────────────────────────────────
 
 async function fetchInvestors() {
   try {
-    const res = await fetch('/api/investors');
+    const res  = await fetch('/api/investors');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     console.log('[investors API]', JSON.stringify(data));
     investorsData = data;
     renderInvestorCharts(data);
+    renderInvestorStatus(data);
   } catch (err) {
     console.error('[fetchInvestors]', err);
     showToast(investorsData ? '데이터 갱신 실패 — 이전 데이터 유지 중' : '투자자 데이터를 불러올 수 없습니다');
   }
 }
 
-// ── 4. renderIndices ──────────────────────────────────────────────────────
+/** Mock 여부 / 업데이트 시각 / 안내문 렌더링 */
+function renderInvestorStatus(data) {
+  const badge   = document.getElementById('investor-data-badge');
+  const updated = document.getElementById('investor-updated');
+  const notice  = document.getElementById('investor-mock-notice');
+  const reason  = document.getElementById('mock-reason');
 
-function createSparkline(canvasEl, sparkline, change) {
-  const color = (change === null || change === undefined || change >= 0) ? '#22c55e' : '#ef4444';
-  return new Chart(canvasEl, {
+  if (data.isMock) {
+    if (badge) badge.innerHTML =
+      '<span class="bg-yellow-900/60 text-yellow-400 border border-yellow-700/50 px-2 py-0.5 rounded text-xs">⚠️ 모의데이터</span>';
+    if (notice)  notice.classList.remove('hidden');
+    if (reason)  reason.textContent = data.mockReason ? `(${data.mockReason})` : '';
+  } else {
+    if (badge) {
+      const futureTag = data.futuresMock
+        ? ' <span class="text-yellow-400/70 text-xs">(선물 mock)</span>'
+        : '';
+      badge.innerHTML =
+        `<span class="bg-green-900/60 text-green-400 border border-green-700/50 px-2 py-0.5 rounded text-xs">📡 KIS 실시간</span>${futureTag}`;
+    }
+    if (notice) notice.classList.add('hidden');
+  }
+
+  if (updated) updated.textContent = data.updatedAt ? `갱신: ${formatTime(data.updatedAt)}` : '';
+}
+
+// ── 4. renderIndices ──────────────────────────────────────────────────────────
+
+function createSparkline(el, sparkline, change) {
+  const color = (change == null || change >= 0) ? '#22c55e' : '#ef4444';
+  return new Chart(el, {
     type: 'line',
     data: {
       labels: sparkline.map((_, i) => i),
@@ -135,7 +150,7 @@ function createSparkline(canvasEl, sparkline, change) {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      scales: { x: { display: false }, y: { display: false } },
+      scales:  { x: { display: false }, y: { display: false } },
       animation: false,
     },
   });
@@ -145,32 +160,32 @@ function renderIndices(indices) {
   const container = document.getElementById('indices-container');
   container.innerHTML = '';
   indices.forEach((idx) => {
-    const isNull = idx.value === null;
+    const isNull    = idx.value === null;
     const valueText = isNull ? 'N/A' : idx.value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const cls = colorClass(idx.change);
-    const card = document.createElement('div');
-    card.className = 'index-card';
-    card.id = `index-${idx.id}`;
-    card.innerHTML = `
+    const cls       = colorClass(idx.change);
+    const card      = document.createElement('div');
+    card.className  = 'index-card';
+    card.id         = `index-${idx.id}`;
+    card.innerHTML  = `
       <div class="text-slate-400 text-xs mb-1">${idx.name}</div>
       <div class="text-2xl font-bold mb-1 ${cls}">${valueText}</div>
       <div class="text-sm mb-0.5"></div>
       <div class="text-xs ${cls}">${isNull ? 'N/A' : formatChangeRate(idx.changeRate)}</div>
-      <div class="sparkline-wrapper mt-2" style="height:40px; position:relative;">
+      <div class="sparkline-wrapper mt-2" style="height:40px;position:relative;">
         <canvas class="sparkline-canvas" id="sparkline-${idx.id}"></canvas>
       </div>
     `;
     card.querySelectorAll('div')[2].innerHTML = isNull ? '—' : formatChange(idx.change);
     container.appendChild(card);
     if (Array.isArray(idx.sparkline) && idx.sparkline.length > 1) {
-      const canvasEl = card.querySelector(`#sparkline-${idx.id}`);
+      const cv = card.querySelector(`#sparkline-${idx.id}`);
       if (sparklineCharts[idx.id]) sparklineCharts[idx.id].destroy();
-      sparklineCharts[idx.id] = createSparkline(canvasEl, idx.sparkline, idx.change);
+      sparklineCharts[idx.id] = createSparkline(cv, idx.sparkline, idx.change);
     }
   });
 }
 
-// ── 5. renderStocks ───────────────────────────────────────────────────────
+// ── 5. renderStocks ───────────────────────────────────────────────────────────
 
 function renderStocks(stocks) {
   currentStocks = stocks || [];
@@ -180,61 +195,38 @@ function renderStocks(stocks) {
 function renderStocksTable(stocks) {
   const tbody = document.getElementById('stocks-tbody');
   tbody.innerHTML = '';
-
   if (!stocks || stocks.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-500">데이터 없음</td></tr>';
     return;
   }
-
-  stocks.forEach((stock) => {
-    const rateCls   = colorClass(stock.changeRate);
-    const changeCls = colorClass(stock.change);
+  stocks.forEach((s) => {
     const tr = document.createElement('tr');
     tr.className = 'border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors';
-
-    // 현재가 (comma 포맷)
-    const priceText  = stock.price  != null ? stock.price.toLocaleString('ko-KR') + '원' : 'N/A';
-    // 등락가격
-    const changeHtml = formatChangePrice(stock.change);
-    // 등락률
-    const rateText   = formatChangeRate(stock.changeRate);
-    // 거래량
-    const volumeText = stock.volume != null ? stock.volume.toLocaleString('ko-KR') : 'N/A';
-    // 편입비율
-    const ratioText  = stock.ratio  != null ? stock.ratio.toFixed(2) + '%' : '—';
-
     tr.innerHTML = `
-      <td class="px-4 py-3 font-medium text-[#f1f5f9]">${stock.name}</td>
-      <td class="px-4 py-3 text-right font-mono">${priceText}</td>
-      <td class="px-4 py-3 text-right font-mono">${changeHtml}</td>
-      <td class="px-4 py-3 text-right font-mono ${rateCls}">${rateText}</td>
-      <td class="px-4 py-3 text-right font-mono text-slate-300">${volumeText}</td>
-      <td class="px-4 py-3 text-right font-mono text-slate-400">${ratioText}</td>
+      <td class="px-4 py-3 font-medium text-[#f1f5f9]">${s.name}</td>
+      <td class="px-4 py-3 text-right font-mono">${s.price != null ? s.price.toLocaleString('ko-KR') + '원' : 'N/A'}</td>
+      <td class="px-4 py-3 text-right font-mono">${formatChangePrice(s.change)}</td>
+      <td class="px-4 py-3 text-right font-mono ${colorClass(s.changeRate)}">${formatChangeRate(s.changeRate)}</td>
+      <td class="px-4 py-3 text-right font-mono text-slate-300">${s.volume != null ? s.volume.toLocaleString('ko-KR') : 'N/A'}</td>
+      <td class="px-4 py-3 text-right font-mono text-slate-400">${s.ratio != null ? s.ratio.toFixed(2) + '%' : '—'}</td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-// ── 6. 종목 테이블 정렬 ───────────────────────────────────────────────────
+// ── 6. 종목 테이블 정렬 ────────────────────────────────────────────────────────
 
 function initStockSorting() {
   document.querySelectorAll('.sortable').forEach((th) => {
     th.addEventListener('click', () => {
       const col = th.dataset.col;
-      if (stockSortState.col === col) { stockSortState.asc = !stockSortState.asc; }
+      if (stockSortState.col === col) stockSortState.asc = !stockSortState.asc;
       else { stockSortState.col = col; stockSortState.asc = true; }
-
       document.querySelectorAll('.sortable').forEach((el) => el.classList.remove('active'));
       th.classList.add('active');
-
       const sorted = [...currentStocks].sort((a, b) => {
-        let va, vb;
-        if      (col === 'price')      { va = a.price      ?? 0; vb = b.price      ?? 0; }
-        else if (col === 'change')     { va = a.change     ?? 0; vb = b.change     ?? 0; }
-        else if (col === 'changeRate') { va = a.changeRate ?? 0; vb = b.changeRate ?? 0; }
-        else if (col === 'volume')     { va = a.volume     ?? 0; vb = b.volume     ?? 0; }
-        else if (col === 'ratio')      { va = a.ratio      ?? 0; vb = b.ratio      ?? 0; }
-        else { va = 0; vb = 0; }
+        const key = col;
+        const va = a[key] ?? 0, vb = b[key] ?? 0;
         return stockSortState.asc ? va - vb : vb - va;
       });
       renderStocksTable(sorted);
@@ -242,7 +234,7 @@ function initStockSorting() {
   });
 }
 
-// ── 7. renderFxOil ────────────────────────────────────────────────────────
+// ── 7. renderFxOil ────────────────────────────────────────────────────────────
 
 function renderFxOil(fx, oil) {
   const container = document.getElementById('fx-oil-container');
@@ -251,64 +243,64 @@ function renderFxOil(fx, oil) {
     const card = document.createElement('div');
     card.className = 'fx-oil-card';
     card.id = id;
-    const valueText  = value      != null ? value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A';
-    const changeText = change     != null ? `${Math.abs(change).toFixed(2)}` : '—';
-    const rateText   = changeRate != null ? formatChangeRate(changeRate) : 'N/A';
+    const vt = value      != null ? value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A';
+    const ct = change     != null ? `${Math.abs(change).toFixed(2)}` : '—';
+    const rt = changeRate != null ? formatChangeRate(changeRate) : 'N/A';
     card.innerHTML = `
       <div class="text-slate-400 text-xs mb-1">${label}</div>
-      <div class="text-xl font-bold mb-1 ${colorClass(change)}">${valueText}</div>
+      <div class="text-xl font-bold mb-1 ${colorClass(change)}">${vt}</div>
       <div class="flex items-center gap-1 text-sm"></div>
     `;
-    card.querySelectorAll('div')[2].innerHTML = `${directionIcon(change)} <span>${changeText}</span> <span class="text-xs">(${rateText})</span>`;
+    card.querySelectorAll('div')[2].innerHTML = `${directionIcon(change)} <span>${ct}</span> <span class="text-xs">(${rt})</span>`;
     container.appendChild(card);
   };
-  fx.forEach((item)  => renderCard(`fx-${item.id.replace('/', '-')}`, item.id,   item.value, item.change, item.changeRate));
-  oil.forEach((item) => renderCard(`oil-${item.id}`,                   item.name, item.value, item.change, item.changeRate));
+  fx.forEach((i)  => renderCard(`fx-${i.id.replace('/','- ')}`,  i.id,   i.value, i.change, i.changeRate));
+  oil.forEach((i) => renderCard(`oil-${i.id}`,                   i.name, i.value, i.change, i.changeRate));
 }
 
-// ── 8. renderInvestorCharts ───────────────────────────────────────────────
+// ── 8. renderInvestorCharts ───────────────────────────────────────────────────
 
 function renderInvestorCharts(data) {
-  const futuresUnit = data.futuresUnit || '계약';
+  const futuresUnit  = data.futuresUnit || '계약';
+  const unitDisplay  = futuresUnit.replace('(mock)', '').trim();
   const futuresLabel = document.getElementById('futures-unit-label');
-  if (futuresLabel) futuresLabel.textContent = `(단위: ${futuresUnit})`;
+  if (futuresLabel) futuresLabel.textContent = `(단위: ${unitDisplay})`;
 
   const markets = [
     { key: 'kospi',   canvasId: 'kospi-investor-chart',   unit: data.unit || '억원' },
     { key: 'kosdaq',  canvasId: 'kosdaq-investor-chart',  unit: data.unit || '억원' },
-    { key: 'futures', canvasId: 'futures-investor-chart', unit: futuresUnit },
+    { key: 'futures', canvasId: 'futures-investor-chart', unit: unitDisplay },
   ];
 
   markets.forEach(({ key, canvasId, unit }) => {
-    const raw = data[key];
-    const mkt = raw || { individual: 0, institution: 0, foreign: 0 };
+    const mkt    = data[key] || { individual: 0, institution: 0, foreign: 0 };
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
 
-    const canvasEl = document.getElementById(canvasId);
-    if (!canvasEl) return;
-
-    if (investorCharts[key]) {
-      investorCharts[key].destroy();
-      investorCharts[key] = null;
-    }
+    if (investorCharts[key]) { investorCharts[key].destroy(); investorCharts[key] = null; }
 
     const values = [mkt.individual, mkt.institution, mkt.foreign];
     if (values.every(v => v === 0)) {
-      const wrap = canvasEl.parentElement;
-      wrap.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;font-size:13px;">거래 데이터 없음</div>';
+      canvas.parentElement.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;font-size:13px;">거래 데이터 없음</div>';
       return;
     }
 
-    const colors = values.map((v) => (v >= 0 ? '#3b82f6' : '#ef4444'));
-    investorCharts[key] = new Chart(canvasEl, {
+    investorCharts[key] = new Chart(canvas, {
       type: 'bar',
       data: {
-        labels: ['개인', '기관', '외국인'],
-        datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, borderSkipped: false }],
+        labels:   ['개인', '기관', '외국인'],
+        datasets: [{
+          data:            values,
+          backgroundColor: values.map(v => v >= 0 ? '#3b82f6' : '#ef4444'),
+          borderRadius:    4,
+          borderSkipped:   false,
+        }],
       },
       options: {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
         plugins: {
-          legend: { display: false },
+          legend:  { display: false },
           tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw.toLocaleString('ko-KR')} ${unit}` } },
         },
         scales: {
@@ -335,6 +327,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initStockSorting();
   fetchMarket();
   fetchInvestors();
-  setInterval(fetchMarket, 30000);
+  setInterval(fetchMarket,    30000);
   setInterval(fetchInvestors, 30000);
 });

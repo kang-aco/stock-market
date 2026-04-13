@@ -20,14 +20,13 @@
     </div>
   </header>
 
-  <!-- 섹션 1: 주요 지수 카드 -->
+  <!-- 섹션 1: 주요 지수 -->
   <section class="px-6 py-4">
     <h2 class="text-base font-semibold text-slate-300 mb-3">주요 지수</h2>
-    <div id="indices-container" class="flex gap-4 overflow-x-auto pb-2 hide-scrollbar">
-    </div>
+    <div id="indices-container" class="flex gap-4 overflow-x-auto pb-2 hide-scrollbar"></div>
   </section>
 
-  <!-- 섹션 2: 필승코리아 펀드 종목 테이블 -->
+  <!-- 섹션 2: 필승코리아 펀드 종목 -->
   <section class="px-6 py-4">
     <h2 class="text-base font-semibold text-slate-300 mb-3">필승코리아 펀드 편입 상위 10개 종목</h2>
     <div class="bg-[#1e293b] rounded-xl overflow-hidden">
@@ -43,9 +42,7 @@
           </tr>
         </thead>
         <tbody id="stocks-tbody">
-          <tr>
-            <td colspan="6" class="text-center py-8 text-slate-500">데이터 불러오는 중...</td>
-          </tr>
+          <tr><td colspan="6" class="text-center py-8 text-slate-500">데이터 불러오는 중...</td></tr>
         </tbody>
       </table>
     </div>
@@ -54,43 +51,41 @@
   <!-- 섹션 3: 환율 및 유가 -->
   <section class="px-6 py-4">
     <h2 class="text-base font-semibold text-slate-300 mb-3">환율 및 유가</h2>
-    <div id="fx-oil-container" class="grid grid-cols-2 md:grid-cols-5 gap-4">
-    </div>
+    <div id="fx-oil-container" class="grid grid-cols-2 md:grid-cols-5 gap-4"></div>
   </section>
 
   <!-- 섹션 4: 투자자별 거래금액 -->
   <section class="px-6 py-4 pb-8">
-    <h2 class="text-base font-semibold text-slate-300 mb-3">투자자별 거래금액</h2>
+    <div class="flex items-center gap-3 mb-3">
+      <h2 class="text-base font-semibold text-slate-300">투자자별 거래금액</h2>
+      <span id="investor-data-badge"></span>
+      <span id="investor-updated" class="text-xs text-slate-500"></span>
+    </div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <!-- 코스피 -->
       <div class="bg-[#1e293b] rounded-xl p-4">
         <h3 class="text-sm font-semibold text-slate-400 mb-3">코스피 <span class="text-xs text-slate-500">(단위: 억원)</span></h3>
-        <div class="relative h-40">
-          <canvas id="kospi-investor-chart"></canvas>
-        </div>
+        <div class="relative h-40"><canvas id="kospi-investor-chart"></canvas></div>
       </div>
-      <!-- 코스닥 -->
       <div class="bg-[#1e293b] rounded-xl p-4">
         <h3 class="text-sm font-semibold text-slate-400 mb-3">코스닥 <span class="text-xs text-slate-500">(단위: 억원)</span></h3>
-        <div class="relative h-40">
-          <canvas id="kosdaq-investor-chart"></canvas>
-        </div>
+        <div class="relative h-40"><canvas id="kosdaq-investor-chart"></canvas></div>
       </div>
-      <!-- 코스피200 선물 -->
       <div class="bg-[#1e293b] rounded-xl p-4">
         <h3 class="text-sm font-semibold text-slate-400 mb-3">코스피200 선물 <span class="text-xs text-slate-500" id="futures-unit-label">(단위: 계약)</span></h3>
-        <div id="futures-chart-wrap" class="relative h-40">
-          <canvas id="futures-investor-chart"></canvas>
-        </div>
+        <div id="futures-chart-wrap" class="relative h-40"><canvas id="futures-investor-chart"></canvas></div>
       </div>
+    </div>
+    <!-- mock 안내 메시지 -->
+    <div id="investor-mock-notice" class="hidden mt-3 px-4 py-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg text-yellow-300 text-xs">
+      ⚠️ <strong>모의 데이터</strong>를 표시 중입니다.
+      실시간 데이터를 보려면 Cloudflare Pages 환경변수에 <code class="bg-slate-800 px-1 rounded">KIS_APP_KEY</code>와 <code class="bg-slate-800 px-1 rounded">KIS_APP_SECRET</code>을 설정해 주세요.
+      <span id="mock-reason" class="ml-1 text-yellow-400/70"></span>
     </div>
   </section>
 
   <!-- 토스트 알림 -->
-  <div id="toast" class="toast fixed bottom-4 right-4 hidden bg-slate-800 border border-slate-600 text-slate-200 text-sm px-4 py-3 rounded-lg shadow-lg z-50">
-    메시지
-  </div>
+  <div id="toast" class="toast fixed bottom-4 right-4 hidden bg-slate-800 border border-slate-600 text-slate-200 text-sm px-4 py-3 rounded-lg shadow-lg z-50">메시지</div>
 
-  <script src="assets/dashboard.js?v=20260414"></script>
+  <script src="assets/dashboard.js?v=20260414b"></script>
 </body>
 </html>
