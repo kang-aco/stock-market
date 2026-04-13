@@ -54,8 +54,8 @@
     <div id="fx-oil-container" class="grid grid-cols-2 md:grid-cols-5 gap-4"></div>
   </section>
 
-  <!-- 섹션 4: 투자자별 거래금액 -->
-  <section class="px-6 py-4 pb-8">
+  <!-- 섹션 4: 투자자별 거래금액 (KIS 실시간일 때만 표시) -->
+  <section id="investor-section" class="px-6 py-4 pb-8 hidden">
     <div class="flex items-center gap-3 mb-3">
       <h2 class="text-base font-semibold text-slate-300">투자자별 거래금액</h2>
       <span id="investor-data-badge"></span>
@@ -75,17 +75,21 @@
         <div id="futures-chart-wrap" class="relative h-40"><canvas id="futures-investor-chart"></canvas></div>
       </div>
     </div>
-    <!-- mock 안내 메시지 -->
-    <div id="investor-mock-notice" class="hidden mt-3 px-4 py-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg text-yellow-300 text-xs">
-      ⚠️ <strong>모의 데이터</strong>를 표시 중입니다.
-      실시간 데이터를 보려면 Cloudflare Pages 환경변수에 <code class="bg-slate-800 px-1 rounded">KIS_APP_KEY</code>와 <code class="bg-slate-800 px-1 rounded">KIS_APP_SECRET</code>을 설정해 주세요.
-      <span id="mock-reason" class="ml-1 text-yellow-400/70"></span>
-    </div>
   </section>
+
+  <!-- KIS 키 미설정 안내 (모의 데이터 시에만 표시) -->
+  <div id="investor-mock-notice" class="hidden px-6 pb-8">
+    <div class="px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 text-sm">
+      투자자별 거래금액은 <strong class="text-slate-300">KIS 실시간 데이터</strong>일 때만 표시됩니다.
+      Cloudflare Pages 환경변수에 <code class="bg-slate-700 px-1.5 py-0.5 rounded text-xs text-slate-200">KIS_APP_KEY</code>와
+      <code class="bg-slate-700 px-1.5 py-0.5 rounded text-xs text-slate-200">KIS_APP_SECRET</code>을 설정하면 활성화됩니다.
+      <span id="mock-reason" class="ml-2 text-slate-500 text-xs"></span>
+    </div>
+  </div>
 
   <!-- 토스트 알림 -->
   <div id="toast" class="toast fixed bottom-4 right-4 hidden bg-slate-800 border border-slate-600 text-slate-200 text-sm px-4 py-3 rounded-lg shadow-lg z-50">메시지</div>
 
-  <script src="assets/dashboard.js?v=20260414b"></script>
+  <script src="assets/dashboard.js?v=20260414c"></script>
 </body>
 </html>

@@ -103,38 +103,43 @@ async function fetchInvestors() {
     const data = await res.json();
     console.log('[investors API]', JSON.stringify(data));
     investorsData = data;
-    renderInvestorCharts(data);
-    renderInvestorStatus(data);
+    renderInvestorSection(data);
   } catch (err) {
     console.error('[fetchInvestors]', err);
     showToast(investorsData ? '데이터 갱신 실패 — 이전 데이터 유지 중' : '투자자 데이터를 불러올 수 없습니다');
   }
 }
 
-/** Mock 여부 / 업데이트 시각 / 안내문 렌더링 */
-function renderInvestorStatus(data) {
-  const badge   = document.getElementById('investor-data-badge');
-  const updated = document.getElementById('investor-updated');
+/**
+ * Mock 여부에 따라 섹션 전체를 표시/숨김 후 차트 렌더링
+ */
+function renderInvestorSection(data) {
+  const section = document.getElementById('investor-section');
   const notice  = document.getElementById('investor-mock-notice');
   const reason  = document.getElementById('mock-reason');
+  const badge   = document.getElementById('investor-data-badge');
+  const updated = document.getElementById('investor-updated');
 
   if (data.isMock) {
-    if (badge) badge.innerHTML =
-      '<span class="bg-yellow-900/60 text-yellow-400 border border-yellow-700/50 px-2 py-0.5 rounded text-xs">⚠️ 모의데이터</span>';
-    if (notice)  notice.classList.remove('hidden');
-    if (reason)  reason.textContent = data.mockReason ? `(${data.mockReason})` : '';
+    // Mock 데이터: 섹션 숨김, 안내문 표시
+    section.classList.add('hidden');
+    notice.classList.remove('hidden');
+    if (reason) reason.textContent = data.mockReason ? `(원인: ${data.mockReason})` : '';
   } else {
+    // 실시간 데이터: 섹션 표시, 안내문 숨김
+    section.classList.remove('hidden');
+    notice.classList.add('hidden');
+
     if (badge) {
       const futureTag = data.futuresMock
-        ? ' <span class="text-yellow-400/70 text-xs">(선물 mock)</span>'
-        : '';
+        ? ' <span class="text-yellow-400/70 text-xs">(선물 임시데이터)</span>' : '';
       badge.innerHTML =
         `<span class="bg-green-900/60 text-green-400 border border-green-700/50 px-2 py-0.5 rounded text-xs">📡 KIS 실시간</span>${futureTag}`;
     }
-    if (notice) notice.classList.add('hidden');
-  }
+    if (updated) updated.textContent = data.updatedAt ? `갱신: ${formatTime(data.updatedAt)}` : '';
 
-  if (updated) updated.textContent = data.updatedAt ? `갱신: ${formatTime(data.updatedAt)}` : '';
+    renderInvestorCharts(data);
+  }
 }
 
 // ── 4. renderIndices ──────────────────────────────────────────────────────────
@@ -144,7 +149,7 @@ function createSparkline(el, sparkline, change) {
   return new Chart(el, {
     type: 'line',
     data: {
-      labels: sparkline.map((_, i) => i),
+      labels:   sparkline.map((_, i) => i),
       datasets: [{ data: sparkline, borderColor: color, borderWidth: 1.5, pointRadius: 0, tension: 0.4, fill: false }],
     },
     options: {
@@ -214,7 +219,7 @@ function renderStocksTable(stocks) {
   });
 }
 
-// ── 6. 종목 테이블 정렬 ────────────────────────────────────────────────────────
+// ── 6. 종목 정렬 ─────────────────────────────────────────────────────────────────
 
 function initStockSorting() {
   document.querySelectorAll('.sortable').forEach((th) => {
@@ -225,8 +230,7 @@ function initStockSorting() {
       document.querySelectorAll('.sortable').forEach((el) => el.classList.remove('active'));
       th.classList.add('active');
       const sorted = [...currentStocks].sort((a, b) => {
-        const key = col;
-        const va = a[key] ?? 0, vb = b[key] ?? 0;
+        const va = a[col] ?? 0, vb = b[col] ?? 0;
         return stockSortState.asc ? va - vb : vb - va;
       });
       renderStocksTable(sorted);
@@ -254,22 +258,21 @@ function renderFxOil(fx, oil) {
     card.querySelectorAll('div')[2].innerHTML = `${directionIcon(change)} <span>${ct}</span> <span class="text-xs">(${rt})</span>`;
     container.appendChild(card);
   };
-  fx.forEach((i)  => renderCard(`fx-${i.id.replace('/','- ')}`,  i.id,   i.value, i.change, i.changeRate));
-  oil.forEach((i) => renderCard(`oil-${i.id}`,                   i.name, i.value, i.change, i.changeRate));
+  fx.forEach((i)  => renderCard(`fx-${i.id.replace('/', '-')}`, i.id,   i.value, i.change, i.changeRate));
+  oil.forEach((i) => renderCard(`oil-${i.id}`,                  i.name, i.value, i.change, i.changeRate));
 }
 
 // ── 8. renderInvestorCharts ───────────────────────────────────────────────────
 
 function renderInvestorCharts(data) {
-  const futuresUnit  = data.futuresUnit || '계약';
-  const unitDisplay  = futuresUnit.replace('(mock)', '').trim();
+  const futuresUnit  = (data.futuresUnit || '계약').replace('(mock)', '').trim();
   const futuresLabel = document.getElementById('futures-unit-label');
-  if (futuresLabel) futuresLabel.textContent = `(단위: ${unitDisplay})`;
+  if (futuresLabel) futuresLabel.textContent = `(단위: ${futuresUnit})`;
 
   const markets = [
     { key: 'kospi',   canvasId: 'kospi-investor-chart',   unit: data.unit || '억원' },
     { key: 'kosdaq',  canvasId: 'kosdaq-investor-chart',  unit: data.unit || '억원' },
-    { key: 'futures', canvasId: 'futures-investor-chart', unit: unitDisplay },
+    { key: 'futures', canvasId: 'futures-investor-chart', unit: futuresUnit },
   ];
 
   markets.forEach(({ key, canvasId, unit }) => {
@@ -293,8 +296,7 @@ function renderInvestorCharts(data) {
         datasets: [{
           data:            values,
           backgroundColor: values.map(v => v >= 0 ? '#3b82f6' : '#ef4444'),
-          borderRadius:    4,
-          borderSkipped:   false,
+          borderRadius: 4, borderSkipped: false,
         }],
       },
       options: {
@@ -307,7 +309,9 @@ function renderInvestorCharts(data) {
           x: {
             ticks: {
               color: '#94a3b8', font: { size: 11 },
-              callback: (val) => unit === '계약' ? `${val.toLocaleString('ko-KR')}계` : `${val.toLocaleString('ko-KR')}억`,
+              callback: (val) => unit === '계약'
+                ? `${val.toLocaleString('ko-KR')}계`
+                : `${val.toLocaleString('ko-KR')}억`,
             },
             grid: { color: 'rgba(148,163,184,0.1)' },
           },
