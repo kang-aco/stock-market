@@ -123,20 +123,8 @@ async function fetchInvestors() {
 }
 
 // ── 4. fetchReports ───────────────────────────────────────────────────────
-
-function showSpinners() {
-  document.getElementById('briefing-spinner').classList.remove('hidden');
-  document.getElementById('prediction-spinner').classList.remove('hidden');
-  document.getElementById('briefing-content').classList.add('hidden');
-  document.getElementById('prediction-content').classList.add('hidden');
-}
-
-function hideSpinners() {
-  document.getElementById('briefing-spinner').classList.add('hidden');
-  document.getElementById('prediction-spinner').classList.add('hidden');
-  document.getElementById('briefing-content').classList.remove('hidden');
-  document.getElementById('prediction-content').classList.remove('hidden');
-}
+// 수정: 브리핑 먼저 로드 후 즉시 표시 → 예측 보고서는 브리핑을 POST로 전달받아 생성
+// 기존 병렬 호출 방식은 prediction이 내부에서 briefing을 재호출해 Cloudflare 타임아웃 발생
 
 function textToHtml(text) {
   if (!text) return '';
@@ -144,28 +132,47 @@ function textToHtml(text) {
 }
 
 async function fetchReports() {
-  showSpinners();
+  // 스피너 표시
+  document.getElementById('briefing-spinner').classList.remove('hidden');
+  document.getElementById('briefing-content').classList.add('hidden');
+  document.getElementById('prediction-spinner').classList.remove('hidden');
+  document.getElementById('prediction-content').classList.add('hidden');
+
+  let briefingText = '';
+
+  // Step 1: 브리핑 로드 (캐시 적용 — 첫 호출 후 1시간 동안 즉시 반환)
   try {
-    const [briefingRes, predictionRes] = await Promise.all([
-      fetch('/api/briefing'),
-      fetch('/api/prediction'),
-    ]);
-
-    if (!briefingRes.ok) throw new Error(`briefing HTTP ${briefingRes.status}`);
-    if (!predictionRes.ok) throw new Error(`prediction HTTP ${predictionRes.status}`);
-
+    const briefingRes = await fetch('/api/briefing');
+    if (!briefingRes.ok) throw new Error(`HTTP ${briefingRes.status}`);
     const briefing = await briefingRes.json();
-    const prediction = await predictionRes.json();
-
-    document.getElementById('briefing-content').innerHTML = textToHtml(briefing.report);
-    document.getElementById('prediction-content').innerHTML = textToHtml(prediction.prediction);
+    briefingText = briefing.report || '';
+    document.getElementById('briefing-content').innerHTML = textToHtml(briefingText);
   } catch (err) {
-    console.error('[fetchReports]', err);
-    document.getElementById('briefing-content').innerHTML = '<span class="text-slate-500">보고서를 불러오지 못했습니다.</span>';
-    document.getElementById('prediction-content').innerHTML = '<span class="text-slate-500">보고서를 불러오지 못했습니다.</span>';
-    showToast('데이터 갱신 실패 — 이전 데이터 유지 중');
+    console.error('[fetchReports] briefing:', err);
+    document.getElementById('briefing-content').innerHTML = '<span class="text-slate-500">브리핑을 불러오지 못했습니다.</span>';
+    showToast('브리핑 생성 실패');
   } finally {
-    hideSpinners();
+    document.getElementById('briefing-spinner').classList.add('hidden');
+    document.getElementById('briefing-content').classList.remove('hidden');
+  }
+
+  // Step 2: 예측 보고서 로드 (브리핑 텍스트를 POST로 전달 — 내부 재호출 없음)
+  try {
+    const predictionRes = await fetch('/api/prediction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ briefing: briefingText }),
+    });
+    if (!predictionRes.ok) throw new Error(`HTTP ${predictionRes.status}`);
+    const prediction = await predictionRes.json();
+    document.getElementById('prediction-content').innerHTML = textToHtml(prediction.prediction || '');
+  } catch (err) {
+    console.error('[fetchReports] prediction:', err);
+    document.getElementById('prediction-content').innerHTML = '<span class="text-slate-500">예측 보고서를 불러오지 못했습니다.</span>';
+    showToast('예측 보고서 생성 실패');
+  } finally {
+    document.getElementById('prediction-spinner').classList.add('hidden');
+    document.getElementById('prediction-content').classList.remove('hidden');
   }
 }
 
