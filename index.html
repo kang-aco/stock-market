@@ -20,13 +20,15 @@
     </div>
   </header>
 
-  <!-- 섹션 1: 주요 지수 -->
+  <!-- 섹션 1: 주요 지수 카드 -->
   <section class="px-6 py-4">
     <h2 class="text-base font-semibold text-slate-300 mb-3">주요 지수</h2>
-    <div id="indices-container" class="flex gap-4 overflow-x-auto pb-2 hide-scrollbar"></div>
+    <div id="indices-container" class="flex gap-4 overflow-x-auto pb-2 hide-scrollbar">
+      <!-- 카드가 JS로 렌더링됨 -->
+    </div>
   </section>
 
-  <!-- 섹션 2: 필승코리아 펀드 종목 -->
+  <!-- 섹션 2: 필승코리아 펀드 종목 테이블 -->
   <section class="px-6 py-4">
     <h2 class="text-base font-semibold text-slate-300 mb-3">필승코리아 펀드 편입 상위 10개 종목</h2>
     <div class="bg-[#1e293b] rounded-xl overflow-hidden">
@@ -35,14 +37,14 @@
           <tr class="border-b border-slate-700 text-slate-400">
             <th class="text-left px-4 py-3 font-medium">종목명</th>
             <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="price">현재가</th>
-            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="change">등락가격</th>
             <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="changeRate">등락률 ▲▼</th>
             <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="volume">거래량</th>
-            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="ratio">편입비율</th>
           </tr>
         </thead>
         <tbody id="stocks-tbody">
-          <tr><td colspan="6" class="text-center py-8 text-slate-500">데이터 불러오는 중...</td></tr>
+          <tr>
+            <td colspan="4" class="text-center py-8 text-slate-500">데이터 불러오는 중...</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -51,45 +53,48 @@
   <!-- 섹션 3: 환율 및 유가 -->
   <section class="px-6 py-4">
     <h2 class="text-base font-semibold text-slate-300 mb-3">환율 및 유가</h2>
-    <div id="fx-oil-container" class="grid grid-cols-2 md:grid-cols-5 gap-4"></div>
-  </section>
-
-  <!-- 섹션 4: 투자자별 거래금액 (KIS 실시간일 때만 표시) -->
-  <section id="investor-section" class="px-6 py-4 pb-8 hidden">
-    <div class="flex items-center gap-3 mb-3">
-      <h2 class="text-base font-semibold text-slate-300">투자자별 거래금액</h2>
-      <span id="investor-data-badge"></span>
-      <span id="investor-updated" class="text-xs text-slate-500"></span>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="bg-[#1e293b] rounded-xl p-4">
-        <h3 class="text-sm font-semibold text-slate-400 mb-3">코스피 <span class="text-xs text-slate-500">(단위: 억원)</span></h3>
-        <div class="relative h-40"><canvas id="kospi-investor-chart"></canvas></div>
-      </div>
-      <div class="bg-[#1e293b] rounded-xl p-4">
-        <h3 class="text-sm font-semibold text-slate-400 mb-3">코스닥 <span class="text-xs text-slate-500">(단위: 억원)</span></h3>
-        <div class="relative h-40"><canvas id="kosdaq-investor-chart"></canvas></div>
-      </div>
-      <div class="bg-[#1e293b] rounded-xl p-4">
-        <h3 class="text-sm font-semibold text-slate-400 mb-3">코스피200 선물 <span class="text-xs text-slate-500" id="futures-unit-label">(단위: 계약)</span></h3>
-        <div id="futures-chart-wrap" class="relative h-40"><canvas id="futures-investor-chart"></canvas></div>
-      </div>
+    <div id="fx-oil-container" class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <!-- 카드가 JS로 렌더링됨 -->
     </div>
   </section>
 
-  <!-- KIS 키 미설정 안내 (모의 데이터 시에만 표시) -->
-  <div id="investor-mock-notice" class="hidden px-6 pb-8">
-    <div class="px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 text-sm">
-      투자자별 거래금액은 <strong class="text-slate-300">KIS 실시간 데이터</strong>일 때만 표시됩니다.
-      Cloudflare Pages 환경변수에 <code class="bg-slate-700 px-1.5 py-0.5 rounded text-xs text-slate-200">KIS_APP_KEY</code>와
-      <code class="bg-slate-700 px-1.5 py-0.5 rounded text-xs text-slate-200">KIS_APP_SECRET</code>을 설정하면 활성화됩니다.
-      <span id="mock-reason" class="ml-2 text-slate-500 text-xs"></span>
+  <!-- 섹션 4: AI 시황 분석 보고서 -->
+  <section class="px-6 py-4 pb-8">
+    <h2 class="text-base font-semibold text-slate-300 mb-3">AI 시황 분석 보고서</h2>
+    <button id="refresh-reports" class="mb-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2">
+      🔄 보고서 새로 생성
+    </button>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- 미국 시장 분석 -->
+      <div class="bg-[#1e293b] rounded-xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold text-slate-300">🇺🇸 미국 시장 분석</h3>
+          <button id="copy-briefing" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded-lg transition-colors">📋 복사</button>
+        </div>
+        <div id="briefing-spinner" class="flex items-center justify-center py-8 hidden">
+          <div class="spinner w-8 h-8 border-4 border-slate-600 border-t-blue-400 rounded-full"></div>
+        </div>
+        <div id="briefing-content" class="report-text text-slate-400 text-sm">보고서를 불러오는 중입니다...</div>
+      </div>
+      <!-- 한국 시장 예측 -->
+      <div class="bg-[#1e293b] rounded-xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold text-slate-300">🇰🇷 한국 시장 예측</h3>
+          <button id="copy-prediction" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded-lg transition-colors">📋 복사</button>
+        </div>
+        <div id="prediction-spinner" class="flex items-center justify-center py-8 hidden">
+          <div class="spinner w-8 h-8 border-4 border-slate-600 border-t-blue-400 rounded-full"></div>
+        </div>
+        <div id="prediction-content" class="report-text text-slate-400 text-sm">보고서를 불러오는 중입니다...</div>
+      </div>
     </div>
-  </div>
+  </section>
 
   <!-- 토스트 알림 -->
-  <div id="toast" class="toast fixed bottom-4 right-4 hidden bg-slate-800 border border-slate-600 text-slate-200 text-sm px-4 py-3 rounded-lg shadow-lg z-50">메시지</div>
+  <div id="toast" class="toast fixed bottom-4 right-4 hidden bg-slate-800 border border-slate-600 text-slate-200 text-sm px-4 py-3 rounded-lg shadow-lg z-50">
+    메시지
+  </div>
 
-  <script src="assets/dashboard.js?v=20260414c"></script>
+  <script src="assets/dashboard.js"></script>
 </body>
 </html>
