@@ -37,13 +37,14 @@
           <tr class="border-b border-slate-700 text-slate-400">
             <th class="text-left px-4 py-3 font-medium">종목명</th>
             <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="price">현재가</th>
+            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="change">등락가격 ▲▼</th>
             <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="changeRate">등락률 ▲▼</th>
             <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="volume">거래량</th>
           </tr>
         </thead>
         <tbody id="stocks-tbody">
           <tr>
-            <td colspan="4" class="text-center py-8 text-slate-500">데이터 불러오는 중...</td>
+            <td colspan="5" class="text-center py-8 text-slate-500">데이터 불러오는 중...</td>
           </tr>
         </tbody>
       </table>
@@ -51,42 +52,10 @@
   </section>
 
   <!-- 섹션 3: 환율 및 유가 -->
-  <section class="px-6 py-4">
+  <section class="px-6 py-4 pb-8">
     <h2 class="text-base font-semibold text-slate-300 mb-3">환율 및 유가</h2>
     <div id="fx-oil-container" class="grid grid-cols-2 md:grid-cols-5 gap-4">
       <!-- 카드가 JS로 렌더링됨 -->
-    </div>
-  </section>
-
-  <!-- 섹션 4: AI 시황 분석 보고서 -->
-  <section class="px-6 py-4 pb-8">
-    <h2 class="text-base font-semibold text-slate-300 mb-3">AI 시황 분석 보고서</h2>
-    <button id="refresh-reports" class="mb-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2">
-      🔄 보고서 새로 생성
-    </button>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <!-- 미국 시장 분석 -->
-      <div class="bg-[#1e293b] rounded-xl p-5">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm font-semibold text-slate-300">🇺🇸 미국 시장 분석</h3>
-          <button id="copy-briefing" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded-lg transition-colors">📋 복사</button>
-        </div>
-        <div id="briefing-spinner" class="flex items-center justify-center py-8 hidden">
-          <div class="spinner w-8 h-8 border-4 border-slate-600 border-t-blue-400 rounded-full"></div>
-        </div>
-        <div id="briefing-content" class="report-text text-slate-400 text-sm">보고서를 불러오는 중입니다...</div>
-      </div>
-      <!-- 한국 시장 예측 -->
-      <div class="bg-[#1e293b] rounded-xl p-5">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm font-semibold text-slate-300">🇰🇷 한국 시장 예측</h3>
-          <button id="copy-prediction" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded-lg transition-colors">📋 복사</button>
-        </div>
-        <div id="prediction-spinner" class="flex items-center justify-center py-8 hidden">
-          <div class="spinner w-8 h-8 border-4 border-slate-600 border-t-blue-400 rounded-full"></div>
-        </div>
-        <div id="prediction-content" class="report-text text-slate-400 text-sm">보고서를 불러오는 중입니다...</div>
-      </div>
     </div>
   </section>
 

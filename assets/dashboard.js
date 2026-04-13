@@ -101,54 +101,7 @@ async function fetchMarket() {
   }
 }
 
-// ── 3. fetchReports ───────────────────────────────────────────────────────
-
-function showSpinners() {
-  document.getElementById('briefing-spinner').classList.remove('hidden');
-  document.getElementById('prediction-spinner').classList.remove('hidden');
-  document.getElementById('briefing-content').classList.add('hidden');
-  document.getElementById('prediction-content').classList.add('hidden');
-}
-
-function hideSpinners() {
-  document.getElementById('briefing-spinner').classList.add('hidden');
-  document.getElementById('prediction-spinner').classList.add('hidden');
-  document.getElementById('briefing-content').classList.remove('hidden');
-  document.getElementById('prediction-content').classList.remove('hidden');
-}
-
-function textToHtml(text) {
-  if (!text) return '';
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
-}
-
-async function fetchReports() {
-  showSpinners();
-  try {
-    const [briefingRes, predictionRes] = await Promise.all([
-      fetch('/api/briefing'),
-      fetch('/api/prediction'),
-    ]);
-
-    if (!briefingRes.ok) throw new Error(`briefing HTTP ${briefingRes.status}`);
-    if (!predictionRes.ok) throw new Error(`prediction HTTP ${predictionRes.status}`);
-
-    const briefing = await briefingRes.json();
-    const prediction = await predictionRes.json();
-
-    document.getElementById('briefing-content').innerHTML = textToHtml(briefing.report);
-    document.getElementById('prediction-content').innerHTML = textToHtml(prediction.prediction);
-  } catch (err) {
-    console.error('[fetchReports]', err);
-    document.getElementById('briefing-content').innerHTML = '<span class="text-slate-500">보고서를 불러오지 못했습니다.</span>';
-    document.getElementById('prediction-content').innerHTML = '<span class="text-slate-500">보고서를 불러오지 못했습니다.</span>';
-    showToast('데이터 갱신 실패 — 이전 데이터 유지 중');
-  } finally {
-    hideSpinners();
-  }
-}
-
-// ── 5. renderIndices ──────────────────────────────────────────────────────
+// ── 3. renderIndices ──────────────────────────────────────────────────────
 
 function createSparkline(canvasEl, sparkline, change) {
   const color = (change === null || change === undefined || change >= 0) ? '#22c55e' : '#ef4444';
@@ -219,7 +172,7 @@ function renderIndices(indices) {
   });
 }
 
-// ── 6. renderStocks ───────────────────────────────────────────────────────
+// ── 4. renderStocks ───────────────────────────────────────────────────────
 
 function renderStocks(stocks) {
   currentStocks = stocks || [];
@@ -231,17 +184,25 @@ function renderStocksTable(stocks) {
   tbody.innerHTML = '';
 
   if (!stocks || stocks.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-500">데이터 없음</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-500">데이터 없음</td></tr>';
     return;
   }
 
   stocks.forEach((stock) => {
     const rateCls = colorClass(stock.changeRate);
     const rateText = formatChangeRate(stock.changeRate);
+    const changeText = stock.change == null
+      ? '<span class="text-flat">—</span>'
+      : stock.change > 0
+        ? `<span class="text-rise">▲${Math.abs(stock.change).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}</span>`
+        : stock.change < 0
+          ? `<span class="text-fall">▼${Math.abs(stock.change).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}</span>`
+          : '<span class="text-flat">━0</span>';
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="px-4 py-3 font-medium text-[#f1f5f9]">${stock.name}</td>
       <td class="px-4 py-3 text-right font-mono">${stock.price.toLocaleString('ko-KR')}원</td>
+      <td class="px-4 py-3 text-right font-mono">${changeText}</td>
       <td class="px-4 py-3 text-right font-mono ${rateCls}">${rateText}</td>
       <td class="px-4 py-3 text-right font-mono text-slate-300">${stock.volume.toLocaleString('ko-KR')}</td>
     `;
@@ -249,7 +210,7 @@ function renderStocksTable(stocks) {
   });
 }
 
-// ── 7. 종목 테이블 정렬 ───────────────────────────────────────────────────
+// ── 5. 종목 테이블 정렬 ───────────────────────────────────────────────────
 
 function initStockSorting() {
   document.querySelectorAll('.sortable').forEach((th) => {
@@ -268,7 +229,8 @@ function initStockSorting() {
       const sorted = [...currentStocks].sort((a, b) => {
         let va, vb;
         if (col === 'price') { va = a.price; vb = b.price; }
-        else if (col === 'changeRate') { va = a.changeRate; vb = b.changeRate; }
+        else if (col === 'change') { va = a.change ?? 0; vb = b.change ?? 0; }
+        else if (col === 'changeRate') { va = a.changeRate ?? 0; vb = b.changeRate ?? 0; }
         else { va = a.volume; vb = b.volume; }
         return stockSortState.asc ? va - vb : vb - va;
       });
@@ -278,7 +240,7 @@ function initStockSorting() {
   });
 }
 
-// ── 8. renderFxOil ────────────────────────────────────────────────────────
+// ── 6. renderFxOil ────────────────────────────────────────────────────────
 
 function renderFxOil(fx, oil) {
   const container = document.getElementById('fx-oil-container');
@@ -328,37 +290,15 @@ function renderFxOil(fx, oil) {
   });
 }
 
-// ── 9. 보고서 버튼 ─────────────────────────────────────────────────
-
-function initReportButtons() {
-  document.getElementById('copy-briefing').addEventListener('click', () => {
-    const text = document.getElementById('briefing-content').innerText;
-    navigator.clipboard.writeText(text)
-      .then(() => showToast('브리핑 보고서가 복사되었습니다'))
-      .catch(() => showToast('복사에 실패했습니다'));
-  });
-
-  document.getElementById('copy-prediction').addEventListener('click', () => {
-    const text = document.getElementById('prediction-content').innerText;
-    navigator.clipboard.writeText(text)
-      .then(() => showToast('예측 보고서가 복사되었습니다'))
-      .catch(() => showToast('복사에 실패했습니다'));
-  });
-
-  document.getElementById('refresh-reports').addEventListener('click', fetchReports);
-}
-
-// ── 초기화 ────────────────────────────────────────────────────────────
+// ── 초기화 ────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   updateClock();
   setInterval(updateClock, 1000);
 
   initStockSorting();
-  initReportButtons();
 
   fetchMarket();
-  fetchReports();
 
   setInterval(fetchMarket, 30000);
 });
