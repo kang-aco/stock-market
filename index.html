@@ -59,7 +59,7 @@
   </section>
 
   <!-- 섹션 4: 투자자별 거래금액 -->
-  <section class="px-6 py-4">
+  <section class="px-6 py-4 pb-8">
     <h2 class="text-base font-semibold text-slate-300 mb-3">투자자별 거래금액</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- 코스피 -->
@@ -75,38 +75,6 @@
         <div class="relative h-40">
           <canvas id="kosdaq-investor-chart"></canvas>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 섹션 5: AI 시황 분석 보고서 -->
-  <section class="px-6 py-4 pb-8">
-    <h2 class="text-base font-semibold text-slate-300 mb-3">AI 시황 분석 보고서</h2>
-    <button id="refresh-reports" class="mb-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2">
-      🔄 보고서 새로 생성
-    </button>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <!-- 미국 시장 분석 -->
-      <div class="bg-[#1e293b] rounded-xl p-5">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm font-semibold text-slate-300">🇺🇸 미국 시장 분석</h3>
-          <button id="copy-briefing" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded-lg transition-colors">📋 복사</button>
-        </div>
-        <div id="briefing-spinner" class="flex items-center justify-center py-8 hidden">
-          <div class="spinner w-8 h-8 border-4 border-slate-600 border-t-blue-400 rounded-full"></div>
-        </div>
-        <div id="briefing-content" class="report-text text-slate-400 text-sm">보고서를 불러오는 중입니다...</div>
-      </div>
-      <!-- 한국 시장 예측 -->
-      <div class="bg-[#1e293b] rounded-xl p-5">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-sm font-semibold text-slate-300">🇰🇷 한국 시장 예측</h3>
-          <button id="copy-prediction" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded-lg transition-colors">📋 복사</button>
-        </div>
-        <div id="prediction-spinner" class="flex items-center justify-center py-8 hidden">
-          <div class="spinner w-8 h-8 border-4 border-slate-600 border-t-blue-400 rounded-full"></div>
-        </div>
-        <div id="prediction-content" class="report-text text-slate-400 text-sm">보고서를 불러오는 중입니다...</div>
       </div>
     </div>
   </section>
