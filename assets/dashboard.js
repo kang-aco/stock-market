@@ -46,6 +46,18 @@ function formatChange(change) {
   return `<span class="text-flat">━${abs}</span>`;
 }
 
+/**
+ * 등락가격 포맷 (원화 단위, 콤마 적용)
+ * +1,500 / -500 형태로 표시
+ */
+function formatChangePrice(change) {
+  if (change === null || change === undefined) return '<span class="text-flat">—</span>';
+  const abs = Math.abs(change).toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  if (change > 0) return `<span class="text-rise">+${abs}</span>`;
+  if (change < 0) return `<span class="text-fall">−${abs}</span>`;
+  return `<span class="text-flat">±0</span>`;
+}
+
 function showToast(message) {
   const toast = document.getElementById('toast');
   toast.textContent = message;
@@ -168,18 +180,36 @@ function renderStocks(stocks) {
 function renderStocksTable(stocks) {
   const tbody = document.getElementById('stocks-tbody');
   tbody.innerHTML = '';
+
   if (!stocks || stocks.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8 text-slate-500">데이터 없음</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-500">데이터 없음</td></tr>';
     return;
   }
+
   stocks.forEach((stock) => {
-    const rateCls = colorClass(stock.changeRate);
+    const rateCls   = colorClass(stock.changeRate);
+    const changeCls = colorClass(stock.change);
     const tr = document.createElement('tr');
+    tr.className = 'border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors';
+
+    // 현재가 (comma 포맷)
+    const priceText  = stock.price  != null ? stock.price.toLocaleString('ko-KR') + '원' : 'N/A';
+    // 등락가격
+    const changeHtml = formatChangePrice(stock.change);
+    // 등락률
+    const rateText   = formatChangeRate(stock.changeRate);
+    // 거래량
+    const volumeText = stock.volume != null ? stock.volume.toLocaleString('ko-KR') : 'N/A';
+    // 편입비율
+    const ratioText  = stock.ratio  != null ? stock.ratio.toFixed(2) + '%' : '—';
+
     tr.innerHTML = `
       <td class="px-4 py-3 font-medium text-[#f1f5f9]">${stock.name}</td>
-      <td class="px-4 py-3 text-right font-mono">${stock.price.toLocaleString('ko-KR')}원</td>
-      <td class="px-4 py-3 text-right font-mono ${rateCls}">${formatChangeRate(stock.changeRate)}</td>
-      <td class="px-4 py-3 text-right font-mono text-slate-300">${stock.volume.toLocaleString('ko-KR')}</td>
+      <td class="px-4 py-3 text-right font-mono">${priceText}</td>
+      <td class="px-4 py-3 text-right font-mono">${changeHtml}</td>
+      <td class="px-4 py-3 text-right font-mono ${rateCls}">${rateText}</td>
+      <td class="px-4 py-3 text-right font-mono text-slate-300">${volumeText}</td>
+      <td class="px-4 py-3 text-right font-mono text-slate-400">${ratioText}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -193,13 +223,18 @@ function initStockSorting() {
       const col = th.dataset.col;
       if (stockSortState.col === col) { stockSortState.asc = !stockSortState.asc; }
       else { stockSortState.col = col; stockSortState.asc = true; }
+
       document.querySelectorAll('.sortable').forEach((el) => el.classList.remove('active'));
       th.classList.add('active');
+
       const sorted = [...currentStocks].sort((a, b) => {
         let va, vb;
-        if (col === 'price') { va = a.price; vb = b.price; }
-        else if (col === 'changeRate') { va = a.changeRate; vb = b.changeRate; }
-        else { va = a.volume; vb = b.volume; }
+        if      (col === 'price')      { va = a.price      ?? 0; vb = b.price      ?? 0; }
+        else if (col === 'change')     { va = a.change     ?? 0; vb = b.change     ?? 0; }
+        else if (col === 'changeRate') { va = a.changeRate ?? 0; vb = b.changeRate ?? 0; }
+        else if (col === 'volume')     { va = a.volume     ?? 0; vb = b.volume     ?? 0; }
+        else if (col === 'ratio')      { va = a.ratio      ?? 0; vb = b.ratio      ?? 0; }
+        else { va = 0; vb = 0; }
         return stockSortState.asc ? va - vb : vb - va;
       });
       renderStocksTable(sorted);
@@ -216,10 +251,9 @@ function renderFxOil(fx, oil) {
     const card = document.createElement('div');
     card.className = 'fx-oil-card';
     card.id = id;
-    const valueText = value !== null && value !== undefined
-      ? value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A';
-    const changeText = change !== null && change !== undefined ? `${Math.abs(change).toFixed(2)}` : '—';
-    const rateText = changeRate !== null && changeRate !== undefined ? formatChangeRate(changeRate) : 'N/A';
+    const valueText  = value      != null ? value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'N/A';
+    const changeText = change     != null ? `${Math.abs(change).toFixed(2)}` : '—';
+    const rateText   = changeRate != null ? formatChangeRate(changeRate) : 'N/A';
     card.innerHTML = `
       <div class="text-slate-400 text-xs mb-1">${label}</div>
       <div class="text-xl font-bold mb-1 ${colorClass(change)}">${valueText}</div>
@@ -228,8 +262,8 @@ function renderFxOil(fx, oil) {
     card.querySelectorAll('div')[2].innerHTML = `${directionIcon(change)} <span>${changeText}</span> <span class="text-xs">(${rateText})</span>`;
     container.appendChild(card);
   };
-  fx.forEach((item) => renderCard(`fx-${item.id.replace('/', '-')}`, item.id, item.value, item.change, item.changeRate));
-  oil.forEach((item) => renderCard(`oil-${item.id}`, item.name, item.value, item.change, item.changeRate));
+  fx.forEach((item)  => renderCard(`fx-${item.id.replace('/', '-')}`, item.id,   item.value, item.change, item.changeRate));
+  oil.forEach((item) => renderCard(`oil-${item.id}`,                   item.name, item.value, item.change, item.changeRate));
 }
 
 // ── 8. renderInvestorCharts ───────────────────────────────────────────────
@@ -246,7 +280,6 @@ function renderInvestorCharts(data) {
   ];
 
   markets.forEach(({ key, canvasId, unit }) => {
-    // data에 해당 키가 없으면 모의 값 0으로 폴백
     const raw = data[key];
     const mkt = raw || { individual: 0, institution: 0, foreign: 0 };
 
@@ -258,7 +291,6 @@ function renderInvestorCharts(data) {
       investorCharts[key] = null;
     }
 
-    // 모든 값이 0이면 빈 상태 메시지 표시
     const values = [mkt.individual, mkt.institution, mkt.foreign];
     if (values.every(v => v === 0)) {
       const wrap = canvasEl.parentElement;
@@ -267,7 +299,6 @@ function renderInvestorCharts(data) {
     }
 
     const colors = values.map((v) => (v >= 0 ? '#3b82f6' : '#ef4444'));
-
     investorCharts[key] = new Chart(canvasEl, {
       type: 'bar',
       data: {
@@ -275,9 +306,7 @@ function renderInvestorCharts(data) {
         datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, borderSkipped: false }],
       },
       options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw.toLocaleString('ko-KR')} ${unit}` } },
