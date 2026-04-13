@@ -95,11 +95,7 @@ async function fetchMarket() {
     updateMarketStatusBadge(data.marketStatus);
   } catch (err) {
     console.error('[fetchMarket]', err);
-    if (marketData) {
-      showToast('데이터 갱신 실패 — 이전 데이터 유지 중');
-    } else {
-      showToast('시장 데이터를 불러올 수 없습니다');
-    }
+    showToast(marketData ? '데이터 갱신 실패 — 이전 데이터 유지 중' : '시장 데이터를 불러올 수 없습니다');
   }
 }
 
@@ -114,62 +110,11 @@ async function fetchInvestors() {
     renderInvestorCharts(data);
   } catch (err) {
     console.error('[fetchInvestors]', err);
-    if (investorsData) {
-      showToast('데이터 갱신 실패 — 이전 데이터 유지 중');
-    } else {
-      showToast('투자자 데이터를 불러올 수 없습니다');
-    }
+    showToast(investorsData ? '데이터 갱신 실패 — 이전 데이터 유지 중' : '투자자 데이터를 불러올 수 없습니다');
   }
 }
 
-// ── 4. fetchReports ───────────────────────────────────────────────────────
-
-function showSpinners() {
-  document.getElementById('briefing-spinner').classList.remove('hidden');
-  document.getElementById('prediction-spinner').classList.remove('hidden');
-  document.getElementById('briefing-content').classList.add('hidden');
-  document.getElementById('prediction-content').classList.add('hidden');
-}
-
-function hideSpinners() {
-  document.getElementById('briefing-spinner').classList.add('hidden');
-  document.getElementById('prediction-spinner').classList.add('hidden');
-  document.getElementById('briefing-content').classList.remove('hidden');
-  document.getElementById('prediction-content').classList.remove('hidden');
-}
-
-function textToHtml(text) {
-  if (!text) return '';
-  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
-}
-
-async function fetchReports() {
-  showSpinners();
-  try {
-    const [briefingRes, predictionRes] = await Promise.all([
-      fetch('/api/briefing'),
-      fetch('/api/prediction'),
-    ]);
-
-    if (!briefingRes.ok) throw new Error(`briefing HTTP ${briefingRes.status}`);
-    if (!predictionRes.ok) throw new Error(`prediction HTTP ${predictionRes.status}`);
-
-    const briefing = await briefingRes.json();
-    const prediction = await predictionRes.json();
-
-    document.getElementById('briefing-content').innerHTML = textToHtml(briefing.report);
-    document.getElementById('prediction-content').innerHTML = textToHtml(prediction.prediction);
-  } catch (err) {
-    console.error('[fetchReports]', err);
-    document.getElementById('briefing-content').innerHTML = '<span class="text-slate-500">보고서를 불러오지 못했습니다.</span>';
-    document.getElementById('prediction-content').innerHTML = '<span class="text-slate-500">보고서를 불러오지 못했습니다.</span>';
-    showToast('데이터 갱신 실패 — 이전 데이터 유지 중');
-  } finally {
-    hideSpinners();
-  }
-}
-
-// ── 5. renderIndices ──────────────────────────────────────────────────────
+// ── 4. renderIndices ──────────────────────────────────────────────────────
 
 function createSparkline(canvasEl, sparkline, change) {
   const color = (change === null || change === undefined || change >= 0) ? '#22c55e' : '#ef4444';
@@ -189,14 +134,8 @@ function createSparkline(canvasEl, sparkline, change) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { enabled: false },
-      },
-      scales: {
-        x: { display: false },
-        y: { display: false },
-      },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { display: false }, y: { display: false } },
       animation: false,
     },
   });
@@ -218,31 +157,24 @@ function renderIndices(indices) {
     card.innerHTML = `
       <div class="text-slate-400 text-xs mb-1">${idx.name}</div>
       <div class="text-2xl font-bold mb-1 ${cls}">${valueText}</div>
-      <div class="text-sm mb-0.5 ${cls}">${isNull ? '—' : formatChange(idx.change).replace(/<[^>]+>/g, '')}</div>
+      <div class="text-sm mb-0.5"></div>
       <div class="text-xs ${cls}">${rateText}</div>
       <div class="sparkline-wrapper mt-2" style="height:40px; position:relative;">
         <canvas class="sparkline-canvas" id="sparkline-${idx.id}"></canvas>
       </div>
     `;
-
-    // formatChange 반환값에서 span 태그 유지하려면 innerHTML 사용
-    const changeDiv = card.querySelectorAll('div')[2];
-    changeDiv.innerHTML = isNull ? '—' : formatChange(idx.change);
-
+    card.querySelectorAll('div')[2].innerHTML = isNull ? '—' : formatChange(idx.change);
     container.appendChild(card);
 
-    // 스파크라인
     if (Array.isArray(idx.sparkline) && idx.sparkline.length > 1) {
       const canvasEl = card.querySelector(`#sparkline-${idx.id}`);
-      if (sparklineCharts[idx.id]) {
-        sparklineCharts[idx.id].destroy();
-      }
+      if (sparklineCharts[idx.id]) sparklineCharts[idx.id].destroy();
       sparklineCharts[idx.id] = createSparkline(canvasEl, idx.sparkline, idx.change);
     }
   });
 }
 
-// ── 6. renderStocks ───────────────────────────────────────────────────────
+// ── 5. renderStocks ───────────────────────────────────────────────────────
 
 function renderStocks(stocks) {
   currentStocks = stocks || [];
@@ -260,19 +192,18 @@ function renderStocksTable(stocks) {
 
   stocks.forEach((stock) => {
     const rateCls = colorClass(stock.changeRate);
-    const rateText = formatChangeRate(stock.changeRate);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="px-4 py-3 font-medium text-[#f1f5f9]">${stock.name}</td>
       <td class="px-4 py-3 text-right font-mono">${stock.price.toLocaleString('ko-KR')}원</td>
-      <td class="px-4 py-3 text-right font-mono ${rateCls}">${rateText}</td>
+      <td class="px-4 py-3 text-right font-mono ${rateCls}">${formatChangeRate(stock.changeRate)}</td>
       <td class="px-4 py-3 text-right font-mono text-slate-300">${stock.volume.toLocaleString('ko-KR')}</td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-// ── 7. 종목 테이블 정렬 ───────────────────────────────────────────────────
+// ── 6. 종목 테이블 정렬 ───────────────────────────────────────────────────
 
 function initStockSorting() {
   document.querySelectorAll('.sortable').forEach((th) => {
@@ -284,8 +215,6 @@ function initStockSorting() {
         stockSortState.col = col;
         stockSortState.asc = true;
       }
-
-      // 활성 헤더 표시
       document.querySelectorAll('.sortable').forEach((el) => el.classList.remove('active'));
       th.classList.add('active');
 
@@ -296,13 +225,12 @@ function initStockSorting() {
         else { va = a.volume; vb = b.volume; }
         return stockSortState.asc ? va - vb : vb - va;
       });
-
       renderStocksTable(sorted);
     });
   });
 }
 
-// ── 8. renderFxOil ────────────────────────────────────────────────────────
+// ── 7. renderFxOil ────────────────────────────────────────────────────────
 
 function renderFxOil(fx, oil) {
   const container = document.getElementById('fx-oil-container');
@@ -316,51 +244,28 @@ function renderFxOil(fx, oil) {
     const valueText = value !== null && value !== undefined
       ? value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       : 'N/A';
-
-    const cls = colorClass(change);
-    const changeText = change !== null && change !== undefined
-      ? `${Math.abs(change).toFixed(2)}`
-      : '—';
-    const rateText = changeRate !== null && changeRate !== undefined
-      ? formatChangeRate(changeRate)
-      : 'N/A';
+    const changeText = change !== null && change !== undefined ? `${Math.abs(change).toFixed(2)}` : '—';
+    const rateText = changeRate !== null && changeRate !== undefined ? formatChangeRate(changeRate) : 'N/A';
 
     card.innerHTML = `
       <div class="text-slate-400 text-xs mb-1">${label}</div>
-      <div class="text-xl font-bold ${cls} mb-1">${valueText}</div>
-      <div class="flex items-center gap-1 text-sm ${cls}">
-        <span>${directionIcon(change).replace(/<[^>]+>/g, '')}</span>
-        <span>${changeText}</span>
-        <span class="text-xs">(${rateText})</span>
-      </div>
+      <div class="text-xl font-bold mb-1">${valueText}</div>
+      <div class="flex items-center gap-1 text-sm"></div>
     `;
-
-    // directionIcon은 span 내부 html을 그대로 써야 색상이 적용됨
-    const changeRow = card.querySelectorAll('div')[2];
-    changeRow.innerHTML = `${directionIcon(change)} <span>${changeText}</span> <span class="text-xs">(${rateText})</span>`;
-    changeRow.className = `flex items-center gap-1 text-sm`;
-
+    card.querySelectorAll('div')[1].className = `text-xl font-bold mb-1 ${colorClass(change)}`;
+    card.querySelectorAll('div')[2].innerHTML = `${directionIcon(change)} <span>${changeText}</span> <span class="text-xs">(${rateText})</span>`;
     container.appendChild(card);
   };
 
-  // 환율 3개
-  fx.forEach((item) => {
-    const safeId = `fx-${item.id.replace('/', '-')}`;
-    renderCard(safeId, item.id, item.value, item.change, item.changeRate);
-  });
-
-  // 유가 2개
-  oil.forEach((item) => {
-    renderCard(`oil-${item.id}`, item.name, item.value, item.change, item.changeRate);
-  });
+  fx.forEach((item) => renderCard(`fx-${item.id.replace('/', '-')}`, item.id, item.value, item.change, item.changeRate));
+  oil.forEach((item) => renderCard(`oil-${item.id}`, item.name, item.value, item.change, item.changeRate));
 }
 
-// ── 9. renderInvestorCharts ───────────────────────────────────────────────
+// ── 8. renderInvestorCharts ───────────────────────────────────────────────
 
 function renderInvestorCharts(data) {
   const futuresUnit = data.futuresUnit || '계약';
 
-  // 선물 단위 레이블 갱신
   const futuresLabel = document.getElementById('futures-unit-label');
   if (futuresLabel) futuresLabel.textContent = `(단위: ${futuresUnit})`;
 
@@ -374,27 +279,18 @@ function renderInvestorCharts(data) {
     const mkt = data[key];
     if (!mkt) return;
 
-    const labels = ['개인', '기관', '외국인'];
     const values = [mkt.individual, mkt.institution, mkt.foreign];
     const colors = values.map((v) => (v >= 0 ? '#3b82f6' : '#ef4444'));
-
     const canvasEl = document.getElementById(canvasId);
     if (!canvasEl) return;
 
-    if (investorCharts[key]) {
-      investorCharts[key].destroy();
-    }
+    if (investorCharts[key]) investorCharts[key].destroy();
 
     investorCharts[key] = new Chart(canvasEl, {
       type: 'bar',
       data: {
-        labels,
-        datasets: [{
-          data: values,
-          backgroundColor: colors,
-          borderRadius: 4,
-          borderSkipped: false,
-        }],
+        labels: ['개인', '기관', '외국인'],
+        datasets: [{ data: values, backgroundColor: colors, borderRadius: 4, borderSkipped: false }],
       },
       options: {
         indexAxis: 'y',
@@ -402,28 +298,18 @@ function renderInvestorCharts(data) {
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` ${ctx.raw.toLocaleString('ko-KR')} ${unit}`,
-            },
-          },
+          tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw.toLocaleString('ko-KR')} ${unit}` } },
         },
         scales: {
           x: {
             ticks: {
               color: '#94a3b8',
               font: { size: 11 },
-              callback: (val) => {
-                if (unit === '계약') return `${val.toLocaleString('ko-KR')}계`;
-                return `${val.toLocaleString('ko-KR')}억`;
-              },
+              callback: (val) => unit === '계약' ? `${val.toLocaleString('ko-KR')}계` : `${val.toLocaleString('ko-KR')}억`,
             },
             grid: { color: 'rgba(148,163,184,0.1)' },
           },
-          y: {
-            ticks: { color: '#94a3b8', font: { size: 12 } },
-            grid: { display: false },
-          },
+          y: { ticks: { color: '#94a3b8', font: { size: 12 } }, grid: { display: false } },
         },
         animation: { duration: 400 },
       },
@@ -431,45 +317,14 @@ function renderInvestorCharts(data) {
   });
 }
 
-// ── 10 & 11. 보고서 버튼 ─────────────────────────────────────────────────
-
-function initReportButtons() {
-  document.getElementById('copy-briefing').addEventListener('click', () => {
-    const text = document.getElementById('briefing-content').innerText;
-    navigator.clipboard.writeText(text)
-      .then(() => showToast('브리핑 보고서가 복사되었습니다'))
-      .catch(() => showToast('복사에 실패했습니다'));
-  });
-
-  document.getElementById('copy-prediction').addEventListener('click', () => {
-    const text = document.getElementById('prediction-content').innerText;
-    navigator.clipboard.writeText(text)
-      .then(() => showToast('예측 보고서가 복사되었습니다'))
-      .catch(() => showToast('복사에 실패했습니다'));
-  });
-
-  document.getElementById('refresh-reports').addEventListener('click', fetchReports);
-}
-
-// ── 14. 초기화 ────────────────────────────────────────────────────────────
+// ── 초기화 ───────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-  // 시계 시작
   updateClock();
   setInterval(updateClock, 1000);
-
-  // 정렬 이벤트 등록
   initStockSorting();
-
-  // 보고서 버튼 이벤트 등록
-  initReportButtons();
-
-  // 데이터 최초 로드
   fetchMarket();
   fetchInvestors();
-  fetchReports();
-
-  // 30초 인터벌 갱신
   setInterval(fetchMarket, 30000);
   setInterval(fetchInvestors, 30000);
 });
