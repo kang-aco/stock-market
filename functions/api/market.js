@@ -100,8 +100,6 @@ function extractQuote(json, jpyScale = false) {
 
     const meta = result.meta;
     let price    = meta?.regularMarketPrice ?? null;
-    // regularMarketPreviousClose(전일 공식 종가)를 우선 사용,
-    // 없을 경우에만 chartPreviousClose(차트 기준 종가)로 fallback
     let prevClose = meta?.regularMarketPreviousClose ?? meta?.previousClose ?? meta?.chartPreviousClose ?? null;
 
     if (price === null || price === undefined) return null;
@@ -112,8 +110,16 @@ function extractQuote(json, jpyScale = false) {
       prevClose = prevClose !== null ? prevClose * 100 : null;
     }
 
-    const change     = prevClose !== null ? price - prevClose : null;
-    const changeRate = (change !== null && prevClose) ? (change / prevClose) * 100 : null;
+    // Yahoo Finance가 제공하는 공식 등락값·등락률을 우선 사용 (직접 계산보다 정확)
+    // jpyScale(JPY/KRW)은 Yahoo가 1엔 기준이므로 직접 계산 유지
+    let change, changeRate;
+    if (!jpyScale && meta?.regularMarketChange !== undefined && meta?.regularMarketChangePercent !== undefined) {
+      change     = meta.regularMarketChange;
+      changeRate = meta.regularMarketChangePercent;
+    } else {
+      change     = prevClose !== null ? price - prevClose : null;
+      changeRate = (change !== null && prevClose) ? (change / prevClose) * 100 : null;
+    }
 
     // sparkline: close 배열에서 null 제거 후 마지막 20개
     const rawClose = result.indicators?.quote?.[0]?.close ?? [];
