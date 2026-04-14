@@ -100,8 +100,9 @@ function extractQuote(json, jpyScale = false) {
 
     const meta = result.meta;
     let price    = meta?.regularMarketPrice ?? null;
-    // chartPreviousClose 없으면 regularMarketPreviousClose로 fallback
-    let prevClose = meta?.chartPreviousClose ?? meta?.regularMarketPreviousClose ?? null;
+    // regularMarketPreviousClose(전일 공식 종가)를 우선 사용,
+    // 없을 경우에만 chartPreviousClose(차트 기준 종가)로 fallback
+    let prevClose = meta?.regularMarketPreviousClose ?? meta?.previousClose ?? meta?.chartPreviousClose ?? null;
 
     if (price === null || price === undefined) return null;
 
