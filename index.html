@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>주식 시장 실시간 현황</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body class="bg-[#0f172a] text-[#f1f5f9] min-h-screen">
+
+  <!-- 헤더 -->
+  <header class="sticky top-0 z-10 bg-[#0f172a] border-b border-slate-700 px-6 py-3 flex items-center justify-between">
+    <h1 class="text-lg font-bold text-[#f1f5f9]">📈 주식 시장 실시간 현황</h1>
+    <div class="flex items-center gap-4 text-sm">
+      <span id="market-status-badge" class="px-3 py-1 rounded-full font-semibold text-xs">● 불러오는 중</span>
+      <span id="clock" class="text-slate-300 font-mono"></span>
+      <span class="text-slate-400">마지막 갱신: <span id="last-updated" class="text-slate-300">—</span></span>
+    </div>
+  </header>
+
+  <!-- 섹션 1: 주요 지수 카드 -->
+  <section class="px-6 py-4">
+    <h2 class="text-base font-semibold text-slate-300 mb-3">주요 지수</h2>
+    <div id="indices-container" class="flex gap-4 overflow-x-auto pb-2 hide-scrollbar">
+      <!-- 카드가 JS로 렌더링됨 -->
+    </div>
+  </section>
+
+  <!-- 섹션 2: 필승코리아 펀드 종목 테이블 -->
+  <section class="px-6 py-4">
+    <h2 class="text-base font-semibold text-slate-300 mb-3">필승코리아 펀드 편입 상위 10개 종목</h2>
+    <div class="bg-[#1e293b] rounded-xl overflow-hidden">
+      <table id="stocks-table" class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700 text-slate-400">
+            <th class="text-left px-4 py-3 font-medium">종목명</th>
+            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="price">현재가</th>
+            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="change">등락가격 ▲▼</th>
+            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="changeRate">등락률 ▲▼</th>
+            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="volume">거래량</th>
+          </tr>
+        </thead>
+        <tbody id="stocks-tbody">
+          <tr>
+            <td colspan="5" class="text-center py-8 text-slate-500">데이터 불러오는 중...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 섹션 3: 환율 및 유가 -->
+  <section class="px-6 py-4">
+    <h2 class="text-base font-semibold text-slate-300 mb-3">환율 및 유가</h2>
+    <div id="fx-oil-container" class="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <!-- 카드가 JS로 렌더링됨 -->
+    </div>
+  </section>
+
+  <!-- 토스트 알림 -->
+  <div id="toast" class="toast fixed bottom-4 right-4 hidden bg-slate-800 border border-slate-600 text-slate-200 text-sm px-4 py-3 rounded-lg shadow-lg z-50">
+    메시지
+  </div>
+
+  <script src="assets/dashboard.js"></script>
+</body>
+</html>
