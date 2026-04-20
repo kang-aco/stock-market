@@ -54,10 +54,19 @@ const OIL_TICKERS = [
 
 // ─── KIS API 헬퍼 ─────────────────────────────────────────────────────────────
 
+// 모듈 레벨 토큰 캐시 — CF Worker 인스턴스 수명 동안 재사용해 토큰 발급 빈도를 줄임
+let _kisToken = null;
+let _kisTokenExpiry = 0;
+
 /**
- * KIS OAuth2 액세스 토큰을 발급받습니다.
+ * KIS OAuth2 액세스 토큰을 반환합니다.
+ * 유효한 캐시가 있으면 재사용하고, 만료 1시간 전부터 미리 갱신합니다.
+ * KIS 토큰 유효기간은 약 24시간이므로 23시간으로 캐시합니다.
  */
-async function fetchKisAccessToken(appKey, appSecret) {
+async function getKisAccessToken(appKey, appSecret) {
+  const now = Date.now();
+  if (_kisToken && now < _kisTokenExpiry) return _kisToken;
+
   const res = await fetch(`${KIS_BASE_URL}/oauth2/tokenP`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -66,7 +75,12 @@ async function fetchKisAccessToken(appKey, appSecret) {
   if (!res.ok) throw new Error(`KIS 토큰 발급 실패: HTTP ${res.status}`);
   const json = await res.json();
   if (!json.access_token) throw new Error("KIS 토큰 응답에 access_token 없음");
-  return json.access_token;
+
+  _kisToken = json.access_token;
+  // expires_in(초) 필드가 있으면 활용, 없으면 23시간 기본값
+  const expiresIn = json.expires_in ? (json.expires_in - 3600) * 1000 : 23 * 60 * 60 * 1000;
+  _kisTokenExpiry = now + expiresIn;
+  return _kisToken;
 }
 
 /**
@@ -318,7 +332,7 @@ export async function onRequest(context) {
     let stocks;
     if (appKey && appSecret) {
       try {
-        const accessToken = await fetchKisAccessToken(appKey, appSecret);
+        const accessToken = await getKisAccessToken(appKey, appSecret);
         const kisResults = await Promise.allSettled(
           STOCK_TICKERS.map((def) => fetchKisStockQuote(accessToken, appKey, appSecret, def.kisCode))
         );
