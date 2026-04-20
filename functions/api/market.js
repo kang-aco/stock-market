@@ -1,11 +1,18 @@
 /**
  * Cloudflare Pages Function — /api/market
  *
- * Yahoo Finance에서 국내외 지수, 필승코리아 펀드 종목, 환율, 유가 데이터를
- * 병렬로 수집해 실시간 대시보드용 JSON을 반환합니다.
+ * - 지수/환율/유가: Yahoo Finance (공개 API)
+ * - 필승코리아 펀드 종목 주가: KIS OpenAPI (KIS_APP_KEY, KIS_APP_SECRET 환경변수 필요)
+ *   환경변수 미설정 시 Yahoo Finance로 자동 대체
  *
- * 환경변수: 없음 (Yahoo Finance는 공개 API)
+ * 환경변수 (Cloudflare Pages → Settings → Environment Variables):
+ *   KIS_APP_KEY    — 한국투자증권 앱 키
+ *   KIS_APP_SECRET — 한국투자증권 앱 시크릿
  */
+
+// ─── 상수 ─────────────────────────────────────────────────────────────────────
+
+const KIS_BASE_URL = "https://openapi.koreainvestment.com:9443";
 
 // ─── 티커 정의 ────────────────────────────────────────────────────────────────
 
@@ -19,17 +26,18 @@ const INDEX_TICKERS = [
   { ticker: "^SOX",   id: "SOX",        name: "필라델피아반도체", optional: false },
 ];
 
+// kisCode: KIS API용 종목코드 (6자리), ticker: Yahoo Finance 폴백용
 const STOCK_TICKERS = [
-  { ticker: "005930.KS", name: "삼성전자" },
-  { ticker: "000660.KS", name: "SK하이닉스" },
-  { ticker: "005380.KS", name: "현대차" },
-  { ticker: "000270.KS", name: "기아" },
-  { ticker: "373220.KS", name: "LG에너지솔루션" },
-  { ticker: "005490.KS", name: "POSCO홀딩스" },
-  { ticker: "068270.KS", name: "셀트리온" },
-  { ticker: "207940.KS", name: "삼성바이오로직스" },
-  { ticker: "105560.KS", name: "KB금융" },
-  { ticker: "055550.KS", name: "신한지주" },
+  { ticker: "005930.KS", kisCode: "005930", name: "삼성전자" },
+  { ticker: "000660.KS", kisCode: "000660", name: "SK하이닉스" },
+  { ticker: "005380.KS", kisCode: "005380", name: "현대차" },
+  { ticker: "000270.KS", kisCode: "000270", name: "기아" },
+  { ticker: "373220.KS", kisCode: "373220", name: "LG에너지솔루션" },
+  { ticker: "005490.KS", kisCode: "005490", name: "POSCO홀딩스" },
+  { ticker: "068270.KS", kisCode: "068270", name: "셀트리온" },
+  { ticker: "207940.KS", kisCode: "207940", name: "삼성바이오로직스" },
+  { ticker: "105560.KS", kisCode: "105560", name: "KB금융" },
+  { ticker: "055550.KS", kisCode: "055550", name: "신한지주" },
 ];
 
 const FX_TICKERS = [
@@ -43,6 +51,76 @@ const OIL_TICKERS = [
   { ticker: "CL=F", id: "WTI",   name: "WTI 원유" },
   { ticker: "BZ=F", id: "BRENT", name: "브렌트유" },
 ];
+
+// ─── KIS API 헬퍼 ─────────────────────────────────────────────────────────────
+
+/**
+ * KIS OAuth2 액세스 토큰을 발급받습니다.
+ */
+async function fetchKisAccessToken(appKey, appSecret) {
+  const res = await fetch(`${KIS_BASE_URL}/oauth2/tokenP`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ grant_type: "client_credentials", appkey: appKey, appsecret: appSecret }),
+  });
+  if (!res.ok) throw new Error(`KIS 토큰 발급 실패: HTTP ${res.status}`);
+  const json = await res.json();
+  if (!json.access_token) throw new Error("KIS 토큰 응답에 access_token 없음");
+  return json.access_token;
+}
+
+/**
+ * KIS 주식현재가 API로 단일 종목 시세를 조회합니다.
+ * prdy_vrss_sign: '1'=상한 '2'=상승 '3'=보합 '4'=하한 '5'=하락
+ *
+ * @returns {{ price, change, changeRate, volume }|null}
+ */
+async function fetchKisStockQuote(accessToken, appKey, appSecret, kisCode) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  try {
+    const params = new URLSearchParams({ FID_COND_MRKT_DIV_CODE: "J", FID_INPUT_ISCD: kisCode });
+    const url = `${KIS_BASE_URL}/uapi/domestic-stock/v1/quotations/inquire-price?${params}`;
+    const res = await fetch(url, {
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "authorization": `Bearer ${accessToken}`,
+        "appkey":        appKey,
+        "appsecret":     appSecret,
+        "tr_id":         "FHKST01010100",
+      },
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const o = json?.output;
+    if (!o) return null;
+
+    const price = parseFloat(o.stck_prpr);
+    if (isNaN(price) || price === 0) return null;
+
+    const rawChange = parseFloat(o.prdy_vrss) || 0;
+    const rawRate   = parseFloat(o.prdy_ctrt)  || 0;
+    const sign      = o.prdy_vrss_sign;
+    const neg       = sign === "4" || sign === "5";
+    const flat      = sign === "3";
+
+    const change     = flat ? 0 : neg ? -Math.abs(rawChange) : Math.abs(rawChange);
+    const changeRate = flat ? 0 : neg ? -Math.abs(rawRate)   : Math.abs(rawRate);
+    const volume     = parseInt(o.acml_vol, 10);
+
+    return {
+      price:      round(price, 0),
+      change:     round(change, 0),
+      changeRate: round(changeRate, 2),
+      volume:     isNaN(volume) ? null : volume,
+    };
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 // ─── 공통 헬퍼 ────────────────────────────────────────────────────────────────
 
@@ -151,6 +229,23 @@ function round(val, digits) {
   return parseFloat(val.toFixed(digits));
 }
 
+/**
+ * Yahoo Finance로 STOCK_TICKERS 주가를 조회하는 폴백 함수
+ */
+async function fetchStocksFromYahoo() {
+  const results = await Promise.allSettled(
+    STOCK_TICKERS.map((def) => fetchYahooTicker(def.ticker))
+  );
+  return STOCK_TICKERS
+    .map((def, i) => {
+      const json = results[i].status === "fulfilled" ? results[i].value : null;
+      const q = extractQuote(json);
+      if (!q) return null;
+      return { id: def.ticker, name: def.name, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
+    })
+    .filter(Boolean);
+}
+
 // ─── 장 상태 판단 (KST 기준) ─────────────────────────────────────────────────
 
 /**
@@ -184,24 +279,23 @@ export async function onRequest(context) {
   }
 
   try {
-    // ── 모든 티커를 단일 Promise.allSettled로 병렬 수집 ──────────────────────
-    // 실패한 티커는 null로 처리되며 필터링됩니다.
+    const appKey    = context.env?.KIS_APP_KEY;
+    const appSecret = context.env?.KIS_APP_SECRET;
 
-    const allTickers = [
+    // ── 지수·환율·유가: Yahoo Finance 병렬 수집 ──────────────────────────────
+    const yahooTickers = [
       ...INDEX_TICKERS.map((d) => ({ ...d, group: "index" })),
-      ...STOCK_TICKERS.map((d) => ({ ...d, group: "stock" })),
       ...FX_TICKERS.map((d)    => ({ ...d, group: "fx"    })),
       ...OIL_TICKERS.map((d)   => ({ ...d, group: "oil"   })),
     ];
 
-    const results = await Promise.allSettled(
-      allTickers.map((item) => fetchYahooTicker(item.ticker))
+    const yahooResults = await Promise.allSettled(
+      yahooTickers.map((item) => fetchYahooTicker(item.ticker))
     );
 
-    // results[i] 와 allTickers[i] 는 인덱스가 일치합니다.
     const quoteMap = {};
-    results.forEach((result, i) => {
-      const item = allTickers[i];
+    yahooResults.forEach((result, i) => {
+      const item = yahooTickers[i];
       const json = result.status === "fulfilled" ? result.value : null;
       const isJpy = item.ticker === "JPYKRW=X";
       quoteMap[item.ticker] = extractQuote(json, isJpy);
@@ -210,8 +304,6 @@ export async function onRequest(context) {
     // ── indices ──────────────────────────────────────────────────────────────
     const indices = INDEX_TICKERS.map((def) => {
       const q = quoteMap[def.ticker];
-
-      // optional 티커(코스닥150선물)는 데이터가 없어도 value:null로 포함
       return {
         id:         def.id,
         name:       def.name,
@@ -222,21 +314,28 @@ export async function onRequest(context) {
       };
     });
 
-    // ── stocks ───────────────────────────────────────────────────────────────
-    const stocks = STOCK_TICKERS
-      .map((def) => {
-        const q = quoteMap[def.ticker];
-        if (!q) return null; // 실패한 종목은 제외
-        return {
-          id:         def.ticker,
-          name:       def.name,
-          price:      q.price,
-          change:     q.change,
-          changeRate: q.changeRate,
-          volume:     q.volume,
-        };
-      })
-      .filter(Boolean);
+    // ── stocks: KIS API 우선, 미설정 시 Yahoo Finance 폴백 ───────────────────
+    let stocks;
+    if (appKey && appSecret) {
+      try {
+        const accessToken = await fetchKisAccessToken(appKey, appSecret);
+        const kisResults = await Promise.allSettled(
+          STOCK_TICKERS.map((def) => fetchKisStockQuote(accessToken, appKey, appSecret, def.kisCode))
+        );
+        stocks = STOCK_TICKERS
+          .map((def, i) => {
+            const q = kisResults[i].status === "fulfilled" ? kisResults[i].value : null;
+            if (!q) return null;
+            return { id: def.ticker, name: def.name, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
+          })
+          .filter(Boolean);
+      } catch (kisErr) {
+        console.error("[market.js] KIS 주가 조회 실패, Yahoo Finance로 대체:", kisErr?.message);
+        stocks = await fetchStocksFromYahoo();
+      }
+    } else {
+      stocks = await fetchStocksFromYahoo();
+    }
 
     // ── fx ───────────────────────────────────────────────────────────────────
     const fx = FX_TICKERS

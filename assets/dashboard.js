@@ -204,7 +204,7 @@ function renderStocksTable(stocks) {
       <td class="px-4 py-3 text-right font-mono">${stock.price.toLocaleString('ko-KR')}원</td>
       <td class="px-4 py-3 text-right font-mono">${changeText}</td>
       <td class="px-4 py-3 text-right font-mono ${rateCls}">${rateText}</td>
-      <td class="px-4 py-3 text-right font-mono text-slate-300">${stock.volume.toLocaleString('ko-KR')}</td>
+      <td class="px-4 py-3 text-right font-mono text-slate-300">${stock.volume != null ? stock.volume.toLocaleString('ko-KR') : '—'}</td>
     `;
     tbody.appendChild(tr);
   });
