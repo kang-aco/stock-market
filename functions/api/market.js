@@ -160,7 +160,8 @@ async function fetchYahooTicker(ticker) {
   const timeoutId = setTimeout(() => controller.abort(), 5000);
 
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1m&range=1d`;
+    // = 는 선물(CL=F, BZ=F)·환율(KRW=X) 티커에 사용되므로 인코딩하지 않음
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker).replace(/%3D/gi, '=')}?interval=1m&range=1d`;
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
       signal: controller.signal,
