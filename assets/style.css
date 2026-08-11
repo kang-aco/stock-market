@@ -182,6 +182,17 @@ body {
   gap: 8px;
 }
 .section-title:first-of-type { margin-top: 0; }
+.section-note {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
+/* 펀드 비중 — 시세와 갱신 주기가 다르므로 시각적으로 구분 */
+.fund-table .weight {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
 
 /* ===== Indices Grid ===== */
 .indices-grid {

@@ -38,18 +38,20 @@ const INDEX_TICKERS = [
   { ticker: "^GDAXI",    id: "DAX",        name: "DAX",              region: "eu",    optional: true  },
 ];
 
+// NH아문디 필승코리아 증권투자신탁[주식] 편입 상위 5개 종목.
+// weight = 펀드 내 비중(%), 운용사 공시값이며 FUND_WEIGHT_AS_OF 기준입니다.
+// 펀드 보유내역은 실시간 공시 대상이 아니므로 비중은 시세와 달리 갱신되지 않습니다.
+// 출처: https://www.nh-amundi.com/fund/C96F2EB7DB974F97 (주요 보유 종목 TOP5)
 // kisCode: KIS API용 종목코드 (6자리), ticker: Yahoo Finance 폴백용
+const FUND_WEIGHT_AS_OF = "2026-07-10";
+
 const STOCK_TICKERS = [
-  { ticker: "005930.KS", kisCode: "005930", name: "삼성전자" },
-  { ticker: "000660.KS", kisCode: "000660", name: "SK하이닉스" },
-  { ticker: "005380.KS", kisCode: "005380", name: "현대차" },
-  { ticker: "000270.KS", kisCode: "000270", name: "기아" },
-  { ticker: "373220.KS", kisCode: "373220", name: "LG에너지솔루션" },
-  { ticker: "005490.KS", kisCode: "005490", name: "POSCO홀딩스" },
-  { ticker: "068270.KS", kisCode: "068270", name: "셀트리온" },
-  { ticker: "207940.KS", kisCode: "207940", name: "삼성바이오로직스" },
-  { ticker: "105560.KS", kisCode: "105560", name: "KB금융" },
-  { ticker: "055550.KS", kisCode: "055550", name: "신한지주" },
+  { ticker: "005930.KS", kisCode: "005930", name: "삼성전자",                 weight: 30.74 },
+  { ticker: "000660.KS", kisCode: "000660", name: "SK하이닉스",               weight: 25.70 },
+  { ticker: "402340.KS", kisCode: "402340", name: "SK스퀘어",                 weight: 5.58  },
+  { ticker: "009150.KS", kisCode: "009150", name: "삼성전기",                 weight: 3.90  },
+  // 2026년 4월 LIG넥스원에서 사명 변경 (종목코드 079550은 그대로)
+  { ticker: "079550.KS", kisCode: "079550", name: "LIG디펜스앤에어로스페이스", weight: 2.05  },
 ];
 
 const FX_TICKERS = [
@@ -298,7 +300,7 @@ async function fetchStocksFromYahoo() {
       const json = results[i].status === "fulfilled" ? results[i].value : null;
       const q = extractQuote(json);
       if (!q) return null;
-      return { id: def.ticker, code: def.kisCode, name: def.name, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
+      return { id: def.ticker, code: def.kisCode, name: def.name, weight: def.weight, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
     })
     .filter(Boolean);
 }
@@ -389,7 +391,7 @@ export async function onRequest(context) {
           .map((def, i) => {
             const q = kisResults[i].status === "fulfilled" ? kisResults[i].value : null;
             if (!q) return null;
-            return { id: def.ticker, code: def.kisCode, name: def.name, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
+            return { id: def.ticker, code: def.kisCode, name: def.name, weight: def.weight, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
           })
           .filter(Boolean);
       } catch (kisErr) {
@@ -436,6 +438,8 @@ export async function onRequest(context) {
       stocks,
       fx,
       commodities,
+      // 펀드 비중 공시 기준일 — 시세(updatedAt)와 갱신 주기가 다름을 화면에 알리기 위함
+      fundAsOf:     FUND_WEIGHT_AS_OF,
       updatedAt:    new Date().toISOString(),
       marketStatus: getMarketStatus(),
     };

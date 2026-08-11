@@ -167,6 +167,11 @@ async function fetchMarket() {
     renderStocks(data.stocks);
     renderFxCommodities(data.fx, data.commodities);
     document.getElementById('last-updated').textContent = formatTime(data.updatedAt);
+    // 비중은 운용사 공시값이라 시세와 갱신 주기가 다름 — 기준일을 함께 표기
+    const asOfEl = document.getElementById('fund-as-of');
+    if (asOfEl) {
+      asOfEl.textContent = data.fundAsOf ? `비중 기준일 ${data.fundAsOf} · 출처 NH아문디자산운용` : '';
+    }
     updateMarketStatusBadge(data.marketStatus);
   } catch (err) {
     console.error('[fetchMarket]', err);
@@ -309,7 +314,7 @@ function renderStocksTable() {
   const tbody = document.getElementById('stocks-tbody');
 
   if (currentStocks.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="loading-text">데이터 없음</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="loading-text">데이터 없음</td></tr>';
     return;
   }
 
@@ -335,6 +340,7 @@ function renderStocksTable() {
           <div class="stock-name">${escapeHtml(stock.name)}</div>
           <div class="stock-code">${escapeHtml(stock.code || stock.id)}</div>
         </td>
+        <td class="num weight">${stock.weight != null ? stock.weight.toFixed(2) + '%' : '—'}</td>
         <td class="num">${formatNumber(stock.price, 0)}</td>
         <td class="num ${cls}">${changeText}</td>
         <td class="num ${cls}">${formatChangeRate(stock.changeRate)}</td>

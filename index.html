@@ -73,13 +73,15 @@
     <!-- 섹션 3: 필승코리아 펀드 종목 -->
     <div class="section-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-      필승코리아 펀드 편입 상위 10개 종목
+      필승코리아 펀드 편입 상위 5개 종목
+      <span class="section-note" id="fund-as-of"></span>
     </div>
     <div class="fund-table-wrap">
       <table class="fund-table" id="stocks-table">
         <thead>
           <tr>
             <th>종목명</th>
+            <th class="num sortable" data-col="weight">비중</th>
             <th class="num sortable" data-col="price">현재가</th>
             <th class="num sortable" data-col="change">등락가격</th>
             <th class="num sortable" data-col="changeRate">등락률</th>
@@ -87,7 +89,7 @@
           </tr>
         </thead>
         <tbody id="stocks-tbody">
-          <tr><td colspan="5" class="loading-text">데이터를 불러오는 중...</td></tr>
+          <tr><td colspan="6" class="loading-text">데이터를 불러오는 중...</td></tr>
         </tbody>
       </table>
     </div>
