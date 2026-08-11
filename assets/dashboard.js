@@ -2,307 +2,394 @@
 
 // ── 전역 상태 ──────────────────────────────────────────────────────────────
 let marketData = null;
-let sparklineCharts = {};
-let stockSortState = { col: null, asc: true };
+let currentRegion = 'all';                       // all | korea | us | asia | eu
+let stockSortState = { col: null, asc: false };  // 첫 클릭은 내림차순
 let currentStocks = [];
 
+const REFRESH_INTERVAL_MS = 30000;
+
 // ── 유틸 ──────────────────────────────────────────────────────────────────
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
 
 function formatTime(isoString) {
   if (!isoString) return '—';
   const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '—';
   return d.toLocaleString('ko-KR', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+    month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
   });
 }
 
+function formatNumber(n, decimals = 2) {
+  if (n === null || n === undefined || isNaN(n)) return 'N/A';
+  return n.toLocaleString('ko-KR', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+/** 값의 크기에 맞춰 소수 자릿수를 정합니다 (비트코인처럼 큰 값은 정수). */
+function autoDecimals(value) {
+  if (value === null || value === undefined || isNaN(value)) return 2;
+  return Math.abs(value) >= 10000 ? 0 : 2;
+}
+
+function formatVolume(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  if (n >= 100000000) return (n / 100000000).toFixed(1) + '억';
+  if (n >= 10000) return Math.round(n / 10000).toLocaleString('ko-KR') + '만';
+  return n.toLocaleString('ko-KR');
+}
+
 function colorClass(value) {
-  if (value === null || value === undefined) return 'text-flat';
+  if (value === null || value === undefined || isNaN(value)) return 'text-flat';
   if (value > 0) return 'text-rise';
   if (value < 0) return 'text-fall';
   return 'text-flat';
 }
 
-function directionIcon(value) {
-  if (value === null || value === undefined || value === 0) return '<span class="text-flat">━</span>';
-  if (value > 0) return '<span class="text-rise">▲</span>';
-  return '<span class="text-fall">▼</span>';
+function arrowFor(value) {
+  if (value === null || value === undefined || isNaN(value) || value === 0) return '━';
+  return value > 0 ? '▲' : '▼';
 }
 
 function formatChangeRate(rate) {
-  if (rate === null || rate === undefined) return 'N/A';
-  const sign = rate >= 0 ? '+' : '';
+  if (rate === null || rate === undefined || isNaN(rate)) return 'N/A';
+  const sign = rate > 0 ? '+' : '';
   return `${sign}${rate.toFixed(2)}%`;
-}
-
-function formatChange(change) {
-  if (change === null || change === undefined) return 'N/A';
-  const abs = Math.abs(change).toFixed(2);
-  if (change > 0) return `<span class="text-rise">▲${abs}</span>`;
-  if (change < 0) return `<span class="text-fall">▼${abs}</span>`;
-  return `<span class="text-flat">━${abs}</span>`;
 }
 
 function showToast(message) {
   const toast = document.getElementById('toast');
   toast.textContent = message;
   toast.classList.remove('hidden');
-  setTimeout(() => toast.classList.add('hidden'), 3000);
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
-// ── 1. 시계 및 장 상태 뱃지 ─────────────────────────────────────────────────
+// ── 1. 세계 시계 및 장 상태 ────────────────────────────────────────────────
 
-function updateClock() {
-  const now = new Date();
-  document.getElementById('clock').textContent = now.toLocaleTimeString('ko-KR');
+// open/close: 현지 시각 [시, 분] · pre: 개장 전 프리마켓 인정 범위(분)
+const MARKET_HOURS = {
+  seoul:     { tz: 'Asia/Seoul',       open: [9, 0],  close: [15, 30], pre: 60 },
+  ny:        { tz: 'America/New_York', open: [9, 30], close: [16, 0],  pre: 60 },
+  london:    { tz: 'Europe/London',    open: [8, 0],  close: [16, 30], pre: 60 },
+  tokyo:     { tz: 'Asia/Tokyo',       open: [9, 0],  close: [15, 0],  pre: 60 },
+  shanghai:  { tz: 'Asia/Shanghai',    open: [9, 30], close: [15, 0],  pre: 60 },
+  frankfurt: { tz: 'Europe/Berlin',    open: [9, 0],  close: [17, 30], pre: 60 },
+};
+
+/**
+ * 특정 타임존의 현재 시/분/요일을 Intl로 정확히 추출합니다.
+ * (Date 문자열 재파싱 방식은 브라우저별 동작이 달라 사용하지 않습니다.)
+ */
+function getZonedParts(timeZone) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, hour12: false, weekday: 'short',
+    hour: '2-digit', minute: '2-digit',
+  }).formatToParts(new Date());
+
+  const get = (type) => parts.find((p) => p.type === type)?.value;
+  // hour12:false 환경에서 자정이 '24'로 나오는 경우를 보정
+  const hour = parseInt(get('hour'), 10) % 24;
+  return {
+    hour,
+    minute: parseInt(get('minute'), 10),
+    weekday: get('weekday'),
+  };
+}
+
+function getMarketStatus(cityKey) {
+  const m = MARKET_HOURS[cityKey];
+  const { hour, minute, weekday } = getZonedParts(m.tz);
+
+  if (weekday === 'Sat' || weekday === 'Sun') return 'closed';
+
+  const nowMin   = hour * 60 + minute;
+  const openMin  = m.open[0] * 60 + m.open[1];
+  const closeMin = m.close[0] * 60 + m.close[1];
+
+  if (nowMin >= openMin && nowMin < closeMin) return 'open';
+  if (nowMin >= openMin - m.pre && nowMin < openMin) return 'pre';
+  return 'closed';
+}
+
+function formatZonedTime(timeZone) {
+  const { hour, minute } = getZonedParts(timeZone);
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function updateClocks() {
+  const clock = document.getElementById('clock');
+  if (clock) clock.textContent = new Date().toLocaleTimeString('ko-KR');
+
+  Object.keys(MARKET_HOURS).forEach((key) => {
+    const timeEl = document.getElementById('clock-' + key);
+    const dotEl  = document.getElementById('dot-' + key);
+    if (timeEl) timeEl.textContent = formatZonedTime(MARKET_HOURS[key].tz);
+    if (dotEl)  dotEl.className = 'status-dot ' + getMarketStatus(key);
+  });
 }
 
 function updateMarketStatusBadge(status) {
   const badge = document.getElementById('market-status-badge');
-  badge.className = 'px-3 py-1 rounded-full font-semibold text-xs';
-
-  if (status === 'OPEN') {
-    badge.textContent = '● 개장 중';
-    badge.classList.add('bg-green-900', 'text-green-300', 'blink');
-  } else if (status === 'PRE_MARKET') {
-    badge.textContent = '● 프리마켓';
-    badge.classList.add('bg-yellow-900', 'text-yellow-300');
-  } else {
-    badge.textContent = '● 장 마감';
-    badge.classList.add('bg-slate-700', 'text-slate-400');
-  }
+  const map = {
+    OPEN:       ['장중',     'open'],
+    PRE_MARKET: ['프리마켓', 'pre'],
+    CLOSED:     ['장 마감',  'closed'],
+  };
+  const [text, cls] = map[status] || map.CLOSED;
+  badge.className = 'market-badge ' + cls + (cls === 'open' ? ' blink' : '');
+  badge.innerHTML = `<span class="status-dot ${cls}"></span> ${text}`;
 }
 
-// ── 2. fetchMarket ────────────────────────────────────────────────────────
+// ── 2. 데이터 조회 ─────────────────────────────────────────────────────────
 
 async function fetchMarket() {
+  const btn = document.getElementById('btn-refresh');
+  const btnText = document.getElementById('refresh-text');
+  btn.disabled = true;
+  btnText.textContent = '불러오는 중...';
+
   try {
     const res = await fetch('/api/market');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     marketData = data;
 
-    renderIndices(data.indices);
+    renderIndices();
     renderStocks(data.stocks);
-    renderFxOil(data.fx, data.oil);
+    renderFxCommodities(data.fx, data.commodities);
     document.getElementById('last-updated').textContent = formatTime(data.updatedAt);
+    // 비중은 운용사 공시값이라 시세와 갱신 주기가 다름 — 기준일을 함께 표기
+    const asOfEl = document.getElementById('fund-as-of');
+    if (asOfEl) {
+      asOfEl.textContent = data.fundAsOf ? `비중 기준일 ${data.fundAsOf} · 출처 NH아문디자산운용` : '';
+    }
     updateMarketStatusBadge(data.marketStatus);
   } catch (err) {
     console.error('[fetchMarket]', err);
-    if (marketData) {
-      showToast('데이터 갱신 실패 — 이전 데이터 유지 중');
-    } else {
-      showToast('시장 데이터를 불러올 수 없습니다');
-    }
+    showToast(marketData
+      ? '데이터 갱신 실패 — 이전 데이터 유지 중'
+      : '시장 데이터를 불러올 수 없습니다');
+  } finally {
+    btn.disabled = false;
+    btnText.textContent = '새로고침';
   }
 }
 
-// ── 3. renderIndices ──────────────────────────────────────────────────────
+// ── 3. 지수 카드 ───────────────────────────────────────────────────────────
 
-function createSparkline(canvasEl, sparkline, change) {
-  const color = (change === null || change === undefined || change >= 0) ? '#22c55e' : '#ef4444';
-  return new Chart(canvasEl, {
-    type: 'line',
-    data: {
-      labels: sparkline.map((_, i) => i),
-      datasets: [{
-        data: sparkline,
-        borderColor: color,
-        borderWidth: 1.5,
-        pointRadius: 0,
-        tension: 0.4,
-        fill: false,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { enabled: false },
-      },
-      scales: {
-        x: { display: false },
-        y: { display: false },
-      },
-      animation: false,
-    },
-  });
+/**
+ * 실제 시세 배열로 스파크라인 SVG를 그립니다.
+ * 데이터가 2개 미만이면 빈 문자열을 반환합니다.
+ */
+function sparklineSVG(data, change) {
+  if (!Array.isArray(data) || data.length < 2) return '';
+
+  const w = 110, h = 32;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / range) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
+  const color = (change === null || change === undefined || change >= 0)
+    ? 'var(--positive)'
+    : 'var(--danger)';
+  const lastY = (h - ((data[data.length - 1] - min) / range) * h).toFixed(1);
+
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true" style="overflow:visible">
+    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${w}" cy="${lastY}" r="2.5" fill="${color}"/>
+  </svg>`;
 }
 
-function renderIndices(indices) {
+function renderIndices() {
   const container = document.getElementById('indices-container');
-  container.innerHTML = '';
+  const all = marketData?.indices || [];
+  const list = currentRegion === 'all'
+    ? all
+    : all.filter((idx) => idx.region === currentRegion);
 
-  indices.forEach((idx) => {
-    const isNull = idx.value === null;
-    const valueText = isNull ? 'N/A' : idx.value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const cls = colorClass(idx.change);
-    const rateText = isNull ? 'N/A' : formatChangeRate(idx.changeRate);
-
-    const card = document.createElement('div');
-    card.className = 'index-card';
-    card.id = `index-${idx.id}`;
-    card.innerHTML = `
-      <div class="text-slate-400 text-xs mb-1">${idx.name}</div>
-      <div class="text-2xl font-bold mb-1 ${cls}">${valueText}</div>
-      <div class="text-sm mb-0.5 ${cls}">${isNull ? '—' : formatChange(idx.change).replace(/<[^>]+>/g, '')}</div>
-      <div class="text-xs ${cls}">${rateText}</div>
-      <div class="sparkline-wrapper mt-2" style="height:40px; position:relative;">
-        <canvas class="sparkline-canvas" id="sparkline-${idx.id}"></canvas>
-      </div>
-    `;
-
-    // formatChange 반환값에서 span 태그 유지하려면 innerHTML 사용
-    const changeDiv = card.querySelectorAll('div')[2];
-    changeDiv.innerHTML = isNull ? '—' : formatChange(idx.change);
-
-    container.appendChild(card);
-
-    // 스파크라인
-    if (Array.isArray(idx.sparkline) && idx.sparkline.length > 1) {
-      const canvasEl = card.querySelector(`#sparkline-${idx.id}`);
-      if (sparklineCharts[idx.id]) {
-        sparklineCharts[idx.id].destroy();
-      }
-      sparklineCharts[idx.id] = createSparkline(canvasEl, idx.sparkline, idx.change);
-    }
-  });
-}
-
-// ── 6. renderStocks ───────────────────────────────────────────────────────
-
-function renderStocks(stocks) {
-  currentStocks = stocks || [];
-  renderStocksTable(currentStocks);
-}
-
-function renderStocksTable(stocks) {
-  const tbody = document.getElementById('stocks-tbody');
-  tbody.innerHTML = '';
-
-  if (!stocks || stocks.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-slate-500">데이터 없음</td></tr>';
+  if (list.length === 0) {
+    container.innerHTML = '<div class="loading-text">표시할 지수가 없습니다</div>';
     return;
   }
 
-  stocks.forEach((stock) => {
-    const changeCls = colorClass(stock.change);
-    const rateCls = colorClass(stock.changeRate);
-    const rateText = formatChangeRate(stock.changeRate);
-    const changeText = stock.change == null ? '<span class="text-flat">—</span>'
-      : stock.change > 0 ? `<span class="text-rise">▲${Math.abs(stock.change).toLocaleString('ko-KR', {maximumFractionDigits:2})}</span>`
-      : stock.change < 0 ? `<span class="text-fall">▼${Math.abs(stock.change).toLocaleString('ko-KR', {maximumFractionDigits:2})}</span>`
-      : `<span class="text-flat">━0</span>`;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="px-4 py-3 font-medium text-[#f1f5f9]">${stock.name}</td>
-      <td class="px-4 py-3 text-right font-mono">${stock.price.toLocaleString('ko-KR')}원</td>
-      <td class="px-4 py-3 text-right font-mono">${changeText}</td>
-      <td class="px-4 py-3 text-right font-mono ${rateCls}">${rateText}</td>
-      <td class="px-4 py-3 text-right font-mono text-slate-300">${stock.volume != null ? stock.volume.toLocaleString('ko-KR') : '—'}</td>
+  container.innerHTML = list.map((idx, i) => {
+    const isNull = idx.value === null || idx.value === undefined;
+    const cls = colorClass(idx.change);
+    const badgeBg = idx.change > 0 ? 'bg-up' : idx.change < 0 ? 'bg-down' : 'bg-flat';
+
+    const valueText = isNull ? 'N/A' : formatNumber(idx.value, 2);
+    const changeText = (idx.change === null || idx.change === undefined)
+      ? '—'
+      : `${arrowFor(idx.change)} ${formatNumber(Math.abs(idx.change), 2)}`;
+    const rateText = isNull ? 'N/A' : formatChangeRate(idx.changeRate);
+
+    return `
+      <div class="index-card fade-in" style="animation-delay: ${i * 0.04}s">
+        <div class="card-header">
+          <div>
+            <div class="name">${escapeHtml(idx.name)}</div>
+            <div class="symbol-row">
+              <span class="symbol">${escapeHtml(idx.id)}</span>
+              ${idx.region ? `<span class="region-tag">${escapeHtml(idx.region)}</span>` : ''}
+            </div>
+          </div>
+          <span class="badge ${badgeBg} ${cls}">${rateText}</span>
+        </div>
+        <div class="price">${valueText}</div>
+        <div class="change-line ${cls}">${changeText}</div>
+        <div class="sparkline-wrap">${sparklineSVG(idx.sparkline, idx.change)}</div>
+      </div>
     `;
-    tbody.appendChild(tr);
+  }).join('');
+}
+
+function initRegionTabs() {
+  document.querySelectorAll('#region-tabs .tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#region-tabs .tab-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentRegion = btn.dataset.filter;
+      renderIndices();
+    });
   });
 }
 
-// ── 7. 종목 테이블 정렬 ───────────────────────────────────────────────────
+// ── 4. 환율 · 원자재 ───────────────────────────────────────────────────────
+
+function renderFxCommodities(fx, commodities) {
+  const container = document.getElementById('fx-commodity-container');
+  const items = [
+    ...(fx || []).map((item) => ({ label: item.id, ...item })),
+    ...(commodities || []).map((item) => ({ label: item.name, ...item })),
+  ];
+
+  if (items.length === 0) {
+    container.innerHTML = '<div class="loading-text">데이터 없음</div>';
+    return;
+  }
+
+  container.innerHTML = items.map((item, i) => {
+    const cls = colorClass(item.change);
+    const valueText = formatNumber(item.value, autoDecimals(item.value));
+    const changeText = (item.change === null || item.change === undefined)
+      ? '—'
+      : `${arrowFor(item.change)} ${formatNumber(Math.abs(item.change), autoDecimals(item.change))}`;
+
+    return `
+      <div class="commodity-card fade-in" style="animation-delay: ${i * 0.04}s">
+        <span class="name">${escapeHtml(item.label)}</span>
+        <div class="value-group">
+          <div class="value">${valueText}</div>
+          <div class="change ${cls}">${changeText} (${formatChangeRate(item.changeRate)})</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── 5. 펀드 편입 종목 테이블 ───────────────────────────────────────────────
+
+function renderStocks(stocks) {
+  currentStocks = stocks || [];
+  renderStocksTable();
+}
+
+/** 현재 정렬 상태를 적용해 테이블을 그립니다 (자동 갱신 후에도 정렬 유지). */
+function renderStocksTable() {
+  const tbody = document.getElementById('stocks-tbody');
+
+  if (currentStocks.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="loading-text">데이터 없음</td></tr>';
+    return;
+  }
+
+  let rows = [...currentStocks];
+  const { col, asc } = stockSortState;
+  if (col) {
+    rows.sort((a, b) => {
+      const va = a[col] ?? 0;
+      const vb = b[col] ?? 0;
+      return asc ? va - vb : vb - va;
+    });
+  }
+
+  tbody.innerHTML = rows.map((stock, i) => {
+    const cls = colorClass(stock.change);
+    const changeText = (stock.change === null || stock.change === undefined)
+      ? '—'
+      : `${arrowFor(stock.change)} ${formatNumber(Math.abs(stock.change), 0)}`;
+
+    return `
+      <tr class="fade-in" style="animation-delay: ${i * 0.03}s">
+        <td>
+          <div class="stock-name">${escapeHtml(stock.name)}</div>
+          <div class="stock-code">${escapeHtml(stock.code || stock.id)}</div>
+        </td>
+        <td class="num weight">${stock.weight != null ? stock.weight.toFixed(2) + '%' : '—'}</td>
+        <td class="num">${formatNumber(stock.price, 0)}</td>
+        <td class="num ${cls}">${changeText}</td>
+        <td class="num ${cls}">${formatChangeRate(stock.changeRate)}</td>
+        <td class="num">${formatVolume(stock.volume)}</td>
+      </tr>
+    `;
+  }).join('');
+}
 
 function initStockSorting() {
-  document.querySelectorAll('.sortable').forEach((th) => {
+  document.querySelectorAll('#stocks-table th.sortable').forEach((th) => {
+    // 정렬 방향 표시용 화살표 자리
+    const arrow = document.createElement('span');
+    arrow.className = 'sort-arrow';
+    arrow.textContent = '▼';
+    th.appendChild(arrow);
+
     th.addEventListener('click', () => {
       const col = th.dataset.col;
       if (stockSortState.col === col) {
         stockSortState.asc = !stockSortState.asc;
       } else {
         stockSortState.col = col;
-        stockSortState.asc = true;
+        stockSortState.asc = false;   // 첫 클릭은 큰 값부터
       }
 
-      // 활성 헤더 표시
-      document.querySelectorAll('.sortable').forEach((el) => el.classList.remove('active'));
-      th.classList.add('active');
-
-      const sorted = [...currentStocks].sort((a, b) => {
-        let va, vb;
-        if (col === 'price') { va = a.price; vb = b.price; }
-        else if (col === 'change') { va = a.change ?? 0; vb = b.change ?? 0; }
-        else if (col === 'changeRate') { va = a.changeRate ?? 0; vb = b.changeRate ?? 0; }
-        else { va = a.volume; vb = b.volume; }
-        return stockSortState.asc ? va - vb : vb - va;
+      document.querySelectorAll('#stocks-table th.sortable').forEach((el) => {
+        el.classList.remove('active');
+        el.querySelector('.sort-arrow').textContent = '▼';
       });
+      th.classList.add('active');
+      th.querySelector('.sort-arrow').textContent = stockSortState.asc ? '▲' : '▼';
 
-      renderStocksTable(sorted);
+      renderStocksTable();
     });
-  });
-}
-
-// ── 8. renderFxOil ────────────────────────────────────────────────────────
-
-function renderFxOil(fx, oil) {
-  const container = document.getElementById('fx-oil-container');
-  container.innerHTML = '';
-
-  const renderCard = (id, label, value, change, changeRate) => {
-    const card = document.createElement('div');
-    card.className = 'fx-oil-card';
-    card.id = id;
-
-    const valueText = value !== null && value !== undefined
-      ? value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      : 'N/A';
-
-    const cls = colorClass(change);
-    const changeText = change !== null && change !== undefined
-      ? `${Math.abs(change).toFixed(2)}`
-      : '—';
-    const rateText = changeRate !== null && changeRate !== undefined
-      ? formatChangeRate(changeRate)
-      : 'N/A';
-
-    card.innerHTML = `
-      <div class="text-slate-400 text-xs mb-1">${label}</div>
-      <div class="text-xl font-bold ${cls} mb-1">${valueText}</div>
-      <div class="flex items-center gap-1 text-sm ${cls}">
-        <span>${directionIcon(change).replace(/<[^>]+>/g, '')}</span>
-        <span>${changeText}</span>
-        <span class="text-xs">(${rateText})</span>
-      </div>
-    `;
-
-    // directionIcon은 span 내부 html을 그대로 써야 색상이 적용됨
-    const changeRow = card.querySelectorAll('div')[2];
-    changeRow.innerHTML = `${directionIcon(change)} <span>${changeText}</span> <span class="text-xs">(${rateText})</span>`;
-    changeRow.className = `flex items-center gap-1 text-sm`;
-
-    container.appendChild(card);
-  };
-
-  // 환율 3개
-  fx.forEach((item) => {
-    const safeId = `fx-${item.id.replace('/', '-')}`;
-    renderCard(safeId, item.id, item.value, item.change, item.changeRate);
-  });
-
-  // 유가 2개
-  oil.forEach((item) => {
-    renderCard(`oil-${item.id}`, item.name, item.value, item.change, item.changeRate);
   });
 }
 
 // ── 초기화 ────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-  updateClock();
-  setInterval(updateClock, 1000);
+  updateClocks();
+  setInterval(updateClocks, 1000);
 
+  initRegionTabs();
   initStockSorting();
 
-  fetchMarket();
+  document.getElementById('btn-refresh').addEventListener('click', fetchMarket);
 
-  setInterval(fetchMarket, 30000);
+  fetchMarket();
+  setInterval(fetchMarket, REFRESH_INTERVAL_MS);
 });

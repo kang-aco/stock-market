@@ -1,7 +1,7 @@
 /**
  * Cloudflare Pages Function — /api/market
  *
- * - 지수/환율/유가: Yahoo Finance (공개 API)
+ * - 지수(한국·미국·아시아·유럽)/환율/원자재: Yahoo Finance (공개 API)
  * - 필승코리아 펀드 종목 주가: KIS OpenAPI (KIS_APP_KEY, KIS_APP_SECRET 환경변수 필요)
  *   환경변수 미설정 시 Yahoo Finance로 자동 대체
  *
@@ -16,28 +16,42 @@ const KIS_BASE_URL = "https://openapi.koreainvestment.com:9443";
 
 // ─── 티커 정의 ────────────────────────────────────────────────────────────────
 
+// region: 프런트엔드 지역 탭 필터용 (korea | us | asia | eu)
 const INDEX_TICKERS = [
-  { ticker: "^KS11",  id: "KOSPI",      name: "코스피",         optional: false },
-  { ticker: "^KQ11",  id: "KOSDAQ",     name: "코스닥",         optional: false },
-  { ticker: "^KS200", id: "KOSPI200F",  name: "코스피200",      optional: false },
-  { ticker: "^KQ150", id: "KOSDAQ150F", name: "코스닥150선물",  optional: true  },
-  { ticker: "^DJI",   id: "DOW",        name: "다우존스",       optional: false },
-  { ticker: "^IXIC",  id: "NASDAQ",     name: "나스닥",         optional: false },
-  { ticker: "^SOX",   id: "SOX",        name: "필라델피아반도체", optional: false },
+  // 한국
+  { ticker: "^KS11",     id: "KOSPI",      name: "코스피",           region: "korea", optional: false },
+  { ticker: "^KQ11",     id: "KOSDAQ",     name: "코스닥",           region: "korea", optional: false },
+  { ticker: "^KS200",    id: "KOSPI200F",  name: "코스피200",        region: "korea", optional: false },
+  { ticker: "^KQ150",    id: "KOSDAQ150F", name: "코스닥150선물",    region: "korea", optional: true  },
+  // 미국
+  { ticker: "^DJI",      id: "DOW",        name: "다우존스",         region: "us",    optional: false },
+  { ticker: "^IXIC",     id: "NASDAQ",     name: "나스닥",           region: "us",    optional: false },
+  { ticker: "^GSPC",     id: "SP500",      name: "S&P 500",          region: "us",    optional: false },
+  { ticker: "^SOX",      id: "SOX",        name: "필라델피아반도체", region: "us",    optional: false },
+  // 아시아
+  { ticker: "^N225",     id: "N225",       name: "니케이 225",       region: "asia",  optional: true  },
+  { ticker: "000001.SS", id: "SSEC",       name: "상하이종합",       region: "asia",  optional: true  },
+  { ticker: "^HSI",      id: "HSI",        name: "항셍지수",         region: "asia",  optional: true  },
+  // 유럽
+  { ticker: "^STOXX50E", id: "SX5E",       name: "유로스톡스50",     region: "eu",    optional: true  },
+  { ticker: "^FTSE",     id: "UKX",        name: "FTSE 100",         region: "eu",    optional: true  },
+  { ticker: "^GDAXI",    id: "DAX",        name: "DAX",              region: "eu",    optional: true  },
 ];
 
+// NH아문디 필승코리아 증권투자신탁[주식] 편입 상위 5개 종목.
+// weight = 펀드 내 비중(%), 운용사 공시값이며 FUND_WEIGHT_AS_OF 기준입니다.
+// 펀드 보유내역은 실시간 공시 대상이 아니므로 비중은 시세와 달리 갱신되지 않습니다.
+// 출처: https://www.nh-amundi.com/fund/C96F2EB7DB974F97 (주요 보유 종목 TOP5)
 // kisCode: KIS API용 종목코드 (6자리), ticker: Yahoo Finance 폴백용
+const FUND_WEIGHT_AS_OF = "2026-07-10";
+
 const STOCK_TICKERS = [
-  { ticker: "005930.KS", kisCode: "005930", name: "삼성전자" },
-  { ticker: "000660.KS", kisCode: "000660", name: "SK하이닉스" },
-  { ticker: "005380.KS", kisCode: "005380", name: "현대차" },
-  { ticker: "000270.KS", kisCode: "000270", name: "기아" },
-  { ticker: "373220.KS", kisCode: "373220", name: "LG에너지솔루션" },
-  { ticker: "005490.KS", kisCode: "005490", name: "POSCO홀딩스" },
-  { ticker: "068270.KS", kisCode: "068270", name: "셀트리온" },
-  { ticker: "207940.KS", kisCode: "207940", name: "삼성바이오로직스" },
-  { ticker: "105560.KS", kisCode: "105560", name: "KB금융" },
-  { ticker: "055550.KS", kisCode: "055550", name: "신한지주" },
+  { ticker: "005930.KS", kisCode: "005930", name: "삼성전자",                 weight: 30.74 },
+  { ticker: "000660.KS", kisCode: "000660", name: "SK하이닉스",               weight: 25.70 },
+  { ticker: "402340.KS", kisCode: "402340", name: "SK스퀘어",                 weight: 5.58  },
+  { ticker: "009150.KS", kisCode: "009150", name: "삼성전기",                 weight: 3.90  },
+  // 2026년 4월 LIG넥스원에서 사명 변경 (종목코드 079550은 그대로)
+  { ticker: "079550.KS", kisCode: "079550", name: "LIG디펜스앤에어로스페이스", weight: 2.05  },
 ];
 
 const FX_TICKERS = [
@@ -47,9 +61,12 @@ const FX_TICKERS = [
   { ticker: "JPYKRW=X", id: "JPY/KRW", jpyScale: true },
 ];
 
-const OIL_TICKERS = [
-  { ticker: "CL=F", id: "WTI",   name: "WTI 원유" },
-  { ticker: "BZ=F", id: "BRENT", name: "브렌트유" },
+// 원자재·가상자산 — unit은 카드에 표시할 통화/단위 표기
+const COMMODITY_TICKERS = [
+  { ticker: "CL=F",    id: "WTI",   name: "WTI 원유",  unit: "USD" },
+  { ticker: "BZ=F",    id: "BRENT", name: "브렌트유",  unit: "USD" },
+  { ticker: "GC=F",    id: "GOLD",  name: "금",        unit: "USD" },
+  { ticker: "BTC-USD", id: "BTC",   name: "비트코인",  unit: "USD" },
 ];
 
 // ─── KIS API 헬퍼 ─────────────────────────────────────────────────────────────
@@ -161,7 +178,8 @@ async function fetchYahooTicker(ticker) {
 
   try {
     // = 는 선물(CL=F, BZ=F)·환율(KRW=X) 티커에 사용되므로 인코딩하지 않음
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker).replace(/%3D/gi, '=')}?interval=1m&range=1d`;
+    // 일봉 10일치: 전일 종가를 일봉에서 직접 확정하기 위함 (extractQuote 주석 참고)
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker).replace(/%3D/gi, '=')}?interval=1d&range=10d`;
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
       signal: controller.signal,
@@ -182,6 +200,14 @@ async function fetchYahooTicker(ticker) {
 /**
  * Yahoo Finance 응답 JSON에서 핵심 수치를 추출합니다.
  *
+ * 전일 종가는 meta 값을 쓰지 않고 일봉에서 직접 확정합니다. 이유:
+ *  1. meta.regularMarketChange / regularMarketChangePercent 는 Yahoo가 더 이상
+ *     내려주지 않습니다(항상 undefined). 이 값에 의존하던 경로는 죽은 코드였습니다.
+ *  2. 폴백이던 meta.previousClose / chartPreviousClose 는 일부 티커에서 한 거래일
+ *     낡은 값이 옵니다. 실제로 ^KQ11(코스닥)·000001.SS(상하이)가 직전 거래일을
+ *     건너뛴 종가를 반환해 등락률 부호까지 뒤집혔습니다.
+ * 따라서 '현재 거래일보다 앞선 마지막 일봉 종가'를 전일 종가로 사용합니다.
+ *
  * @param {object|null} json     - fetchYahooTicker 반환값
  * @param {boolean}     jpyScale - true이면 가격에 ×100 적용 (JPY/KRW 전용)
  * @returns {{ price, prevClose, change, changeRate, sparkline, volume }|null}
@@ -192,36 +218,54 @@ function extractQuote(json, jpyScale = false) {
     if (!result) return null;
 
     const meta = result.meta;
-    let price    = meta?.regularMarketPrice ?? null;
-    let prevClose = meta?.regularMarketPreviousClose ?? meta?.previousClose ?? meta?.chartPreviousClose ?? null;
 
+    // 거래소 현지 기준 날짜로 봉을 구분한다 (UTC로 자르면 아시아장이 밀림)
+    const dayFormatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: meta?.exchangeTimezoneName || "UTC",
+      year: "numeric", month: "2-digit", day: "2-digit",
+    });
+    const sessionDate = (epochSec) => dayFormatter.format(new Date(epochSec * 1000));
+
+    const stamps = result.timestamp ?? [];
+    const closes = result.indicators?.quote?.[0]?.close ?? [];
+
+    const bars = [];
+    for (let i = 0; i < stamps.length; i++) {
+      const c = closes[i];
+      if (c === null || c === undefined) continue;
+      bars.push({ date: sessionDate(stamps[i]), close: c });
+    }
+
+    let price = meta?.regularMarketPrice ?? bars[bars.length - 1]?.close ?? null;
     if (price === null || price === undefined) return null;
+
+    // 현재 거래일 — 장중이면 오늘, 장 마감 후면 마지막으로 체결된 거래일
+    const currentDate = meta?.regularMarketTime
+      ? sessionDate(meta.regularMarketTime)
+      : bars[bars.length - 1]?.date;
+
+    // 전일 종가 = 현재 거래일보다 앞선 마지막 일봉
+    let prevClose = null;
+    for (let i = bars.length - 1; i >= 0; i--) {
+      if (bars[i].date < currentDate) { prevClose = bars[i].close; break; }
+    }
+    // 일봉이 부족한 티커(^KS200 등)는 meta 값으로 폴백
+    if (prevClose === null) {
+      prevClose = meta?.chartPreviousClose ?? meta?.previousClose ?? null;
+    }
+
+    // sparkline: 최근 10거래일 종가 추세
+    let sparkline = bars.map((b) => b.close).slice(-10);
 
     // JPY/KRW는 1엔 기준이므로 100엔 기준으로 환산
     if (jpyScale) {
-      price     = price     !== null ? price * 100     : null;
+      price     = price * 100;
       prevClose = prevClose !== null ? prevClose * 100 : null;
+      sparkline = sparkline.map((v) => v * 100);
     }
 
-    // Yahoo Finance가 제공하는 공식 등락값·등락률을 우선 사용 (직접 계산보다 정확)
-    // jpyScale(JPY/KRW)은 Yahoo가 1엔 기준이므로 직접 계산 유지
-    let change, changeRate;
-    if (!jpyScale && meta?.regularMarketChange !== undefined && meta?.regularMarketChangePercent !== undefined) {
-      change     = meta.regularMarketChange;
-      changeRate = meta.regularMarketChangePercent;
-    } else {
-      change     = prevClose !== null ? price - prevClose : null;
-      changeRate = (change !== null && prevClose) ? (change / prevClose) * 100 : null;
-    }
-
-    // sparkline: close 배열에서 null 제거 후 마지막 20개
-    const rawClose = result.indicators?.quote?.[0]?.close ?? [];
-    const sparkline = rawClose
-      .filter((v) => v !== null && v !== undefined)
-      .slice(-20)
-      .map((v) => jpyScale ? v * 100 : v);
-
-    const volume = meta?.regularMarketVolume ?? null;
+    const change     = prevClose !== null ? price - prevClose : null;
+    const changeRate = (change !== null && prevClose) ? (change / prevClose) * 100 : null;
 
     return {
       price:      round(price, 2),
@@ -229,7 +273,7 @@ function extractQuote(json, jpyScale = false) {
       change:     round(change, 2),
       changeRate: round(changeRate, 2),
       sparkline,
-      volume,
+      volume:     meta?.regularMarketVolume ?? null,
     };
   } catch (_err) {
     return null;
@@ -256,7 +300,7 @@ async function fetchStocksFromYahoo() {
       const json = results[i].status === "fulfilled" ? results[i].value : null;
       const q = extractQuote(json);
       if (!q) return null;
-      return { id: def.ticker, name: def.name, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
+      return { id: def.ticker, code: def.kisCode, name: def.name, weight: def.weight, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
     })
     .filter(Boolean);
 }
@@ -299,9 +343,9 @@ export async function onRequest(context) {
 
     // ── 지수·환율·유가: Yahoo Finance 병렬 수집 ──────────────────────────────
     const yahooTickers = [
-      ...INDEX_TICKERS.map((d) => ({ ...d, group: "index" })),
-      ...FX_TICKERS.map((d)    => ({ ...d, group: "fx"    })),
-      ...OIL_TICKERS.map((d)   => ({ ...d, group: "oil"   })),
+      ...INDEX_TICKERS.map((d)     => ({ ...d, group: "index"     })),
+      ...FX_TICKERS.map((d)        => ({ ...d, group: "fx"        })),
+      ...COMMODITY_TICKERS.map((d) => ({ ...d, group: "commodity" })),
     ];
 
     const yahooResults = await Promise.allSettled(
@@ -317,17 +361,23 @@ export async function onRequest(context) {
     });
 
     // ── indices ──────────────────────────────────────────────────────────────
-    const indices = INDEX_TICKERS.map((def) => {
-      const q = quoteMap[def.ticker];
-      return {
-        id:         def.id,
-        name:       def.name,
-        value:      q?.price      ?? null,
-        change:     q?.change     ?? null,
-        changeRate: q?.changeRate ?? null,
-        sparkline:  q?.sparkline  ?? [],
-      };
-    });
+    // optional 지수는 시세 조회에 실패하면 카드 자체를 내보내지 않습니다.
+    // (필수 지수는 N/A 상태로라도 노출해 데이터 누락을 드러냅니다.)
+    const indices = INDEX_TICKERS
+      .map((def) => {
+        const q = quoteMap[def.ticker];
+        if (!q && def.optional) return null;
+        return {
+          id:         def.id,
+          name:       def.name,
+          region:     def.region,
+          value:      q?.price      ?? null,
+          change:     q?.change     ?? null,
+          changeRate: q?.changeRate ?? null,
+          sparkline:  q?.sparkline  ?? [],
+        };
+      })
+      .filter(Boolean);
 
     // ── stocks: KIS API 우선, 미설정 시 Yahoo Finance 폴백 ───────────────────
     let stocks;
@@ -341,7 +391,7 @@ export async function onRequest(context) {
           .map((def, i) => {
             const q = kisResults[i].status === "fulfilled" ? kisResults[i].value : null;
             if (!q) return null;
-            return { id: def.ticker, name: def.name, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
+            return { id: def.ticker, code: def.kisCode, name: def.name, weight: def.weight, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
           })
           .filter(Boolean);
       } catch (kisErr) {
@@ -366,14 +416,15 @@ export async function onRequest(context) {
       })
       .filter(Boolean);
 
-    // ── oil ───────────────────────────────────────────────────────────────────
-    const oil = OIL_TICKERS
+    // ── commodities (유가·금·비트코인) ────────────────────────────────────────
+    const commodities = COMMODITY_TICKERS
       .map((def) => {
         const q = quoteMap[def.ticker];
         if (!q) return null;
         return {
           id:         def.id,
           name:       def.name,
+          unit:       def.unit,
           value:      q.price,
           change:     q.change,
           changeRate: q.changeRate,
@@ -386,7 +437,9 @@ export async function onRequest(context) {
       indices,
       stocks,
       fx,
-      oil,
+      commodities,
+      // 펀드 비중 공시 기준일 — 시세(updatedAt)와 갱신 주기가 다름을 화면에 알리기 위함
+      fundAsOf:     FUND_WEIGHT_AS_OF,
       updatedAt:    new Date().toISOString(),
       marketStatus: getMarketStatus(),
     };
