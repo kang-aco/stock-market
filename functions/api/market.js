@@ -176,7 +176,8 @@ async function fetchYahooTicker(ticker) {
 
   try {
     // = 는 선물(CL=F, BZ=F)·환율(KRW=X) 티커에 사용되므로 인코딩하지 않음
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker).replace(/%3D/gi, '=')}?interval=1m&range=1d`;
+    // 일봉 10일치: 전일 종가를 일봉에서 직접 확정하기 위함 (extractQuote 주석 참고)
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker).replace(/%3D/gi, '=')}?interval=1d&range=10d`;
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
       signal: controller.signal,
@@ -197,6 +198,14 @@ async function fetchYahooTicker(ticker) {
 /**
  * Yahoo Finance 응답 JSON에서 핵심 수치를 추출합니다.
  *
+ * 전일 종가는 meta 값을 쓰지 않고 일봉에서 직접 확정합니다. 이유:
+ *  1. meta.regularMarketChange / regularMarketChangePercent 는 Yahoo가 더 이상
+ *     내려주지 않습니다(항상 undefined). 이 값에 의존하던 경로는 죽은 코드였습니다.
+ *  2. 폴백이던 meta.previousClose / chartPreviousClose 는 일부 티커에서 한 거래일
+ *     낡은 값이 옵니다. 실제로 ^KQ11(코스닥)·000001.SS(상하이)가 직전 거래일을
+ *     건너뛴 종가를 반환해 등락률 부호까지 뒤집혔습니다.
+ * 따라서 '현재 거래일보다 앞선 마지막 일봉 종가'를 전일 종가로 사용합니다.
+ *
  * @param {object|null} json     - fetchYahooTicker 반환값
  * @param {boolean}     jpyScale - true이면 가격에 ×100 적용 (JPY/KRW 전용)
  * @returns {{ price, prevClose, change, changeRate, sparkline, volume }|null}
@@ -207,36 +216,54 @@ function extractQuote(json, jpyScale = false) {
     if (!result) return null;
 
     const meta = result.meta;
-    let price    = meta?.regularMarketPrice ?? null;
-    let prevClose = meta?.regularMarketPreviousClose ?? meta?.previousClose ?? meta?.chartPreviousClose ?? null;
 
+    // 거래소 현지 기준 날짜로 봉을 구분한다 (UTC로 자르면 아시아장이 밀림)
+    const dayFormatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: meta?.exchangeTimezoneName || "UTC",
+      year: "numeric", month: "2-digit", day: "2-digit",
+    });
+    const sessionDate = (epochSec) => dayFormatter.format(new Date(epochSec * 1000));
+
+    const stamps = result.timestamp ?? [];
+    const closes = result.indicators?.quote?.[0]?.close ?? [];
+
+    const bars = [];
+    for (let i = 0; i < stamps.length; i++) {
+      const c = closes[i];
+      if (c === null || c === undefined) continue;
+      bars.push({ date: sessionDate(stamps[i]), close: c });
+    }
+
+    let price = meta?.regularMarketPrice ?? bars[bars.length - 1]?.close ?? null;
     if (price === null || price === undefined) return null;
+
+    // 현재 거래일 — 장중이면 오늘, 장 마감 후면 마지막으로 체결된 거래일
+    const currentDate = meta?.regularMarketTime
+      ? sessionDate(meta.regularMarketTime)
+      : bars[bars.length - 1]?.date;
+
+    // 전일 종가 = 현재 거래일보다 앞선 마지막 일봉
+    let prevClose = null;
+    for (let i = bars.length - 1; i >= 0; i--) {
+      if (bars[i].date < currentDate) { prevClose = bars[i].close; break; }
+    }
+    // 일봉이 부족한 티커(^KS200 등)는 meta 값으로 폴백
+    if (prevClose === null) {
+      prevClose = meta?.chartPreviousClose ?? meta?.previousClose ?? null;
+    }
+
+    // sparkline: 최근 10거래일 종가 추세
+    let sparkline = bars.map((b) => b.close).slice(-10);
 
     // JPY/KRW는 1엔 기준이므로 100엔 기준으로 환산
     if (jpyScale) {
-      price     = price     !== null ? price * 100     : null;
+      price     = price * 100;
       prevClose = prevClose !== null ? prevClose * 100 : null;
+      sparkline = sparkline.map((v) => v * 100);
     }
 
-    // Yahoo Finance가 제공하는 공식 등락값·등락률을 우선 사용 (직접 계산보다 정확)
-    // jpyScale(JPY/KRW)은 Yahoo가 1엔 기준이므로 직접 계산 유지
-    let change, changeRate;
-    if (!jpyScale && meta?.regularMarketChange !== undefined && meta?.regularMarketChangePercent !== undefined) {
-      change     = meta.regularMarketChange;
-      changeRate = meta.regularMarketChangePercent;
-    } else {
-      change     = prevClose !== null ? price - prevClose : null;
-      changeRate = (change !== null && prevClose) ? (change / prevClose) * 100 : null;
-    }
-
-    // sparkline: close 배열에서 null 제거 후 마지막 20개
-    const rawClose = result.indicators?.quote?.[0]?.close ?? [];
-    const sparkline = rawClose
-      .filter((v) => v !== null && v !== undefined)
-      .slice(-20)
-      .map((v) => jpyScale ? v * 100 : v);
-
-    const volume = meta?.regularMarketVolume ?? null;
+    const change     = prevClose !== null ? price - prevClose : null;
+    const changeRate = (change !== null && prevClose) ? (change / prevClose) * 100 : null;
 
     return {
       price:      round(price, 2),
@@ -244,7 +271,7 @@ function extractQuote(json, jpyScale = false) {
       change:     round(change, 2),
       changeRate: round(changeRate, 2),
       sparkline,
-      volume,
+      volume:     meta?.regularMarketVolume ?? null,
     };
   } catch (_err) {
     return null;
