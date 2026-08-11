@@ -1,7 +1,7 @@
 /**
  * Cloudflare Pages Function — /api/market
  *
- * - 지수/환율/유가: Yahoo Finance (공개 API)
+ * - 지수(한국·미국·아시아·유럽)/환율/원자재: Yahoo Finance (공개 API)
  * - 필승코리아 펀드 종목 주가: KIS OpenAPI (KIS_APP_KEY, KIS_APP_SECRET 환경변수 필요)
  *   환경변수 미설정 시 Yahoo Finance로 자동 대체
  *
@@ -16,14 +16,26 @@ const KIS_BASE_URL = "https://openapi.koreainvestment.com:9443";
 
 // ─── 티커 정의 ────────────────────────────────────────────────────────────────
 
+// region: 프런트엔드 지역 탭 필터용 (korea | us | asia | eu)
 const INDEX_TICKERS = [
-  { ticker: "^KS11",  id: "KOSPI",      name: "코스피",         optional: false },
-  { ticker: "^KQ11",  id: "KOSDAQ",     name: "코스닥",         optional: false },
-  { ticker: "^KS200", id: "KOSPI200F",  name: "코스피200",      optional: false },
-  { ticker: "^KQ150", id: "KOSDAQ150F", name: "코스닥150선물",  optional: true  },
-  { ticker: "^DJI",   id: "DOW",        name: "다우존스",       optional: false },
-  { ticker: "^IXIC",  id: "NASDAQ",     name: "나스닥",         optional: false },
-  { ticker: "^SOX",   id: "SOX",        name: "필라델피아반도체", optional: false },
+  // 한국
+  { ticker: "^KS11",     id: "KOSPI",      name: "코스피",           region: "korea", optional: false },
+  { ticker: "^KQ11",     id: "KOSDAQ",     name: "코스닥",           region: "korea", optional: false },
+  { ticker: "^KS200",    id: "KOSPI200F",  name: "코스피200",        region: "korea", optional: false },
+  { ticker: "^KQ150",    id: "KOSDAQ150F", name: "코스닥150선물",    region: "korea", optional: true  },
+  // 미국
+  { ticker: "^DJI",      id: "DOW",        name: "다우존스",         region: "us",    optional: false },
+  { ticker: "^IXIC",     id: "NASDAQ",     name: "나스닥",           region: "us",    optional: false },
+  { ticker: "^GSPC",     id: "SP500",      name: "S&P 500",          region: "us",    optional: false },
+  { ticker: "^SOX",      id: "SOX",        name: "필라델피아반도체", region: "us",    optional: false },
+  // 아시아
+  { ticker: "^N225",     id: "N225",       name: "니케이 225",       region: "asia",  optional: true  },
+  { ticker: "000001.SS", id: "SSEC",       name: "상하이종합",       region: "asia",  optional: true  },
+  { ticker: "^HSI",      id: "HSI",        name: "항셍지수",         region: "asia",  optional: true  },
+  // 유럽
+  { ticker: "^STOXX50E", id: "SX5E",       name: "유로스톡스50",     region: "eu",    optional: true  },
+  { ticker: "^FTSE",     id: "UKX",        name: "FTSE 100",         region: "eu",    optional: true  },
+  { ticker: "^GDAXI",    id: "DAX",        name: "DAX",              region: "eu",    optional: true  },
 ];
 
 // kisCode: KIS API용 종목코드 (6자리), ticker: Yahoo Finance 폴백용
@@ -47,9 +59,12 @@ const FX_TICKERS = [
   { ticker: "JPYKRW=X", id: "JPY/KRW", jpyScale: true },
 ];
 
-const OIL_TICKERS = [
-  { ticker: "CL=F", id: "WTI",   name: "WTI 원유" },
-  { ticker: "BZ=F", id: "BRENT", name: "브렌트유" },
+// 원자재·가상자산 — unit은 카드에 표시할 통화/단위 표기
+const COMMODITY_TICKERS = [
+  { ticker: "CL=F",    id: "WTI",   name: "WTI 원유",  unit: "USD" },
+  { ticker: "BZ=F",    id: "BRENT", name: "브렌트유",  unit: "USD" },
+  { ticker: "GC=F",    id: "GOLD",  name: "금",        unit: "USD" },
+  { ticker: "BTC-USD", id: "BTC",   name: "비트코인",  unit: "USD" },
 ];
 
 // ─── KIS API 헬퍼 ─────────────────────────────────────────────────────────────
@@ -256,7 +271,7 @@ async function fetchStocksFromYahoo() {
       const json = results[i].status === "fulfilled" ? results[i].value : null;
       const q = extractQuote(json);
       if (!q) return null;
-      return { id: def.ticker, name: def.name, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
+      return { id: def.ticker, code: def.kisCode, name: def.name, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
     })
     .filter(Boolean);
 }
@@ -299,9 +314,9 @@ export async function onRequest(context) {
 
     // ── 지수·환율·유가: Yahoo Finance 병렬 수집 ──────────────────────────────
     const yahooTickers = [
-      ...INDEX_TICKERS.map((d) => ({ ...d, group: "index" })),
-      ...FX_TICKERS.map((d)    => ({ ...d, group: "fx"    })),
-      ...OIL_TICKERS.map((d)   => ({ ...d, group: "oil"   })),
+      ...INDEX_TICKERS.map((d)     => ({ ...d, group: "index"     })),
+      ...FX_TICKERS.map((d)        => ({ ...d, group: "fx"        })),
+      ...COMMODITY_TICKERS.map((d) => ({ ...d, group: "commodity" })),
     ];
 
     const yahooResults = await Promise.allSettled(
@@ -317,17 +332,23 @@ export async function onRequest(context) {
     });
 
     // ── indices ──────────────────────────────────────────────────────────────
-    const indices = INDEX_TICKERS.map((def) => {
-      const q = quoteMap[def.ticker];
-      return {
-        id:         def.id,
-        name:       def.name,
-        value:      q?.price      ?? null,
-        change:     q?.change     ?? null,
-        changeRate: q?.changeRate ?? null,
-        sparkline:  q?.sparkline  ?? [],
-      };
-    });
+    // optional 지수는 시세 조회에 실패하면 카드 자체를 내보내지 않습니다.
+    // (필수 지수는 N/A 상태로라도 노출해 데이터 누락을 드러냅니다.)
+    const indices = INDEX_TICKERS
+      .map((def) => {
+        const q = quoteMap[def.ticker];
+        if (!q && def.optional) return null;
+        return {
+          id:         def.id,
+          name:       def.name,
+          region:     def.region,
+          value:      q?.price      ?? null,
+          change:     q?.change     ?? null,
+          changeRate: q?.changeRate ?? null,
+          sparkline:  q?.sparkline  ?? [],
+        };
+      })
+      .filter(Boolean);
 
     // ── stocks: KIS API 우선, 미설정 시 Yahoo Finance 폴백 ───────────────────
     let stocks;
@@ -341,7 +362,7 @@ export async function onRequest(context) {
           .map((def, i) => {
             const q = kisResults[i].status === "fulfilled" ? kisResults[i].value : null;
             if (!q) return null;
-            return { id: def.ticker, name: def.name, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
+            return { id: def.ticker, code: def.kisCode, name: def.name, price: q.price, change: q.change, changeRate: q.changeRate, volume: q.volume };
           })
           .filter(Boolean);
       } catch (kisErr) {
@@ -366,14 +387,15 @@ export async function onRequest(context) {
       })
       .filter(Boolean);
 
-    // ── oil ───────────────────────────────────────────────────────────────────
-    const oil = OIL_TICKERS
+    // ── commodities (유가·금·비트코인) ────────────────────────────────────────
+    const commodities = COMMODITY_TICKERS
       .map((def) => {
         const q = quoteMap[def.ticker];
         if (!q) return null;
         return {
           id:         def.id,
           name:       def.name,
+          unit:       def.unit,
           value:      q.price,
           change:     q.change,
           changeRate: q.changeRate,
@@ -386,7 +408,7 @@ export async function onRequest(context) {
       indices,
       stocks,
       fx,
-      oil,
+      commodities,
       updatedAt:    new Date().toISOString(),
       marketStatus: getMarketStatus(),
     };

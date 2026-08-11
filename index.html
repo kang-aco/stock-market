@@ -3,66 +3,103 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>주식 시장 실시간 현황</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>글로벌 마켓 대시보드 | Global Market Dashboard</title>
   <link rel="stylesheet" href="assets/style.css" />
 </head>
-<body class="bg-[#0f172a] text-[#f1f5f9] min-h-screen">
+<body>
+  <div class="container">
 
-  <!-- 헤더 -->
-  <header class="sticky top-0 z-10 bg-[#0f172a] border-b border-slate-700 px-6 py-3 flex items-center justify-between">
-    <h1 class="text-lg font-bold text-[#f1f5f9]">📈 주식 시장 실시간 현황</h1>
-    <div class="flex items-center gap-4 text-sm">
-      <span id="market-status-badge" class="px-3 py-1 rounded-full font-semibold text-xs">● 불러오는 중</span>
-      <span id="clock" class="text-slate-300 font-mono"></span>
-      <span class="text-slate-400">마지막 갱신: <span id="last-updated" class="text-slate-300">—</span></span>
+    <!-- 헤더 -->
+    <div class="header">
+      <div class="header-left">
+        <h1>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent);">
+            <path d="M3 3v18h18"/>
+            <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
+          </svg>
+          글로벌 마켓 대시보드
+        </h1>
+        <div class="subtitle">실시간 세계 주요 지수 · 환율 · 원자재</div>
+      </div>
+      <div class="header-right">
+        <span id="market-status-badge" class="market-badge closed">
+          <span class="status-dot closed"></span> 불러오는 중
+        </span>
+        <span class="clock-item"><span class="time" id="clock"></span></span>
+        <button class="btn btn-primary" id="btn-refresh">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
+          <span id="refresh-text">새로고침</span>
+        </button>
+      </div>
     </div>
-  </header>
 
-  <!-- 섹션 1: 주요 지수 카드 -->
-  <section class="px-6 py-4">
-    <h2 class="text-base font-semibold text-slate-300 mb-3">주요 지수</h2>
-    <div id="indices-container" class="flex gap-4 overflow-x-auto pb-2 hide-scrollbar">
-      <!-- 카드가 JS로 렌더링됨 -->
+    <!-- 세계 시계 -->
+    <div class="world-clock" id="world-clock">
+      <div class="clock-item"><span class="city">서울</span><span class="time" id="clock-seoul">--:--</span><span class="status-dot closed" id="dot-seoul"></span></div>
+      <div class="clock-item"><span class="city">뉴욕</span><span class="time" id="clock-ny">--:--</span><span class="status-dot closed" id="dot-ny"></span></div>
+      <div class="clock-item"><span class="city">런던</span><span class="time" id="clock-london">--:--</span><span class="status-dot closed" id="dot-london"></span></div>
+      <div class="clock-item"><span class="city">도쿄</span><span class="time" id="clock-tokyo">--:--</span><span class="status-dot closed" id="dot-tokyo"></span></div>
+      <div class="clock-item"><span class="city">상하이</span><span class="time" id="clock-shanghai">--:--</span><span class="status-dot closed" id="dot-shanghai"></span></div>
+      <div class="clock-item"><span class="city">프랑크푸르트</span><span class="time" id="clock-frankfurt">--:--</span><span class="status-dot closed" id="dot-frankfurt"></span></div>
     </div>
-  </section>
 
-  <!-- 섹션 2: 필승코리아 펀드 종목 테이블 -->
-  <section class="px-6 py-4">
-    <h2 class="text-base font-semibold text-slate-300 mb-3">필승코리아 펀드 편입 상위 10개 종목</h2>
-    <div class="bg-[#1e293b] rounded-xl overflow-hidden">
-      <table id="stocks-table" class="w-full text-sm">
+    <!-- 지역 필터 탭 -->
+    <div class="tabs" id="region-tabs">
+      <button class="tab-btn active" data-filter="all">전체</button>
+      <button class="tab-btn" data-filter="korea">🇰🇷 한국</button>
+      <button class="tab-btn" data-filter="us">🇺🇸 미국</button>
+      <button class="tab-btn" data-filter="asia">🌏 아시아</button>
+      <button class="tab-btn" data-filter="eu">🇪🇺 유럽</button>
+    </div>
+
+    <!-- 섹션 1: 주요 지수 -->
+    <div class="section-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+      주요 지수
+    </div>
+    <div id="indices-container" class="indices-grid">
+      <div class="loading-text">데이터를 불러오는 중...</div>
+    </div>
+
+    <!-- 섹션 2: 환율 · 원자재 -->
+    <div class="section-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      환율 · 원자재
+    </div>
+    <div id="fx-commodity-container" class="commodities-grid">
+      <div class="loading-text">데이터를 불러오는 중...</div>
+    </div>
+
+    <!-- 섹션 3: 필승코리아 펀드 종목 -->
+    <div class="section-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+      필승코리아 펀드 편입 상위 10개 종목
+    </div>
+    <div class="fund-table-wrap">
+      <table class="fund-table" id="stocks-table">
         <thead>
-          <tr class="border-b border-slate-700 text-slate-400">
-            <th class="text-left px-4 py-3 font-medium">종목명</th>
-            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="price">현재가</th>
-            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="change">등락가격 ▲▼</th>
-            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="changeRate">등락률 ▲▼</th>
-            <th class="sortable cursor-pointer text-right px-4 py-3 font-medium hover:text-[#f1f5f9] transition-colors" data-col="volume">거래량</th>
+          <tr>
+            <th>종목명</th>
+            <th class="num sortable" data-col="price">현재가</th>
+            <th class="num sortable" data-col="change">등락가격</th>
+            <th class="num sortable" data-col="changeRate">등락률</th>
+            <th class="num sortable" data-col="volume">거래량</th>
           </tr>
         </thead>
         <tbody id="stocks-tbody">
-          <tr>
-            <td colspan="5" class="text-center py-8 text-slate-500">데이터 불러오는 중...</td>
-          </tr>
+          <tr><td colspan="5" class="loading-text">데이터를 불러오는 중...</td></tr>
         </tbody>
       </table>
     </div>
-  </section>
 
-  <!-- 섹션 3: 환율 및 유가 -->
-  <section class="px-6 py-4">
-    <h2 class="text-base font-semibold text-slate-300 mb-3">환율 및 유가</h2>
-    <div id="fx-oil-container" class="grid grid-cols-2 md:grid-cols-5 gap-4">
-      <!-- 카드가 JS로 렌더링됨 -->
+    <!-- 푸터 -->
+    <div class="footer">
+      데이터 제공: Yahoo Finance · 한국투자증권 · 마지막 갱신: <span id="last-updated">—</span>
     </div>
-  </section>
+  </div>
 
   <!-- 토스트 알림 -->
-  <div id="toast" class="toast fixed bottom-4 right-4 hidden bg-slate-800 border border-slate-600 text-slate-200 text-sm px-4 py-3 rounded-lg shadow-lg z-50">
-    메시지
-  </div>
+  <div id="toast" class="toast hidden">메시지</div>
 
   <script src="assets/dashboard.js"></script>
 </body>

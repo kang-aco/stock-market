@@ -1,128 +1,382 @@
-/* 1. 스파크라인 canvas 기본 크기 */
-.sparkline-canvas {
-  height: 40px;
-  width: 100%;
-  display: block;
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f0f11;
+  --surface: #18181b;
+  --surface-hover: #1f1f23;
+  --border: #27272a;
+  --border-hover: #3f3f46;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  --text-quaternary: #52525b;
+  --positive: #22c55e;
+  --positive-bg: rgba(34, 197, 94, 0.10);
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.10);
+  --accent: #3b82f6;
+  --accent-bg: rgba(59, 130, 246, 0.10);
+  --warning: #f59e0b;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans KR", sans-serif;
+  --font-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
 }
 
-/* 2. 정렬 가능한 th hover 스타일 */
-th.sortable {
-  user-select: none;
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-hover: #f4f4f5;
+    --border: #e4e4e7;
+    --border-hover: #d4d4d8;
+    --text-primary: #18181b;
+    --text-secondary: #52525b;
+    --text-tertiary: #a1a1aa;
+    --text-quaternary: #d4d4d8;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== Layout ===== */
+.container { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+
+.footer {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-quaternary);
+}
+
+/* ===== Header ===== */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.header-left h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header-left .subtitle {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.market-badge {
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.market-badge.open { background: var(--positive-bg); color: var(--positive); }
+.market-badge.closed { background: var(--danger-bg); color: var(--danger); }
+.market-badge.pre { background: var(--accent-bg); color: var(--accent); }
+
+.btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+.btn:hover { background: var(--surface-hover); border-color: var(--border-hover); color: var(--text-primary); }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--text-primary); color: var(--bg); border-color: var(--text-primary); }
+.btn-primary:hover { opacity: 0.9; background: var(--text-primary); color: var(--bg); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ===== World Clock ===== */
+.world-clock {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+}
+.clock-item { display: flex; align-items: center; gap: 6px; }
+.clock-item .city { color: var(--text-tertiary); }
+.clock-item .time { font-family: var(--font-mono); font-weight: 500; color: var(--text-primary); }
+.clock-item .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.status-dot.open { background: var(--positive); box-shadow: 0 0 4px var(--positive); }
+.status-dot.closed { background: var(--danger); }
+.status-dot.pre { background: var(--warning); }
+
+/* ===== Tabs ===== */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  overflow-x: auto;
+}
+.tab-btn {
+  padding: 7px 16px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+.tab-btn:hover { color: var(--text-primary); background: var(--surface-hover); }
+.tab-btn.active { background: var(--text-primary); color: var(--bg); }
+
+/* ===== Section Title ===== */
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 28px 0 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title:first-of-type { margin-top: 0; }
+
+/* ===== Indices Grid ===== */
+.indices-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.index-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  transition: all 0.2s ease;
   position: relative;
+  overflow: hidden;
+}
+.index-card:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+.index-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.index-card .name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.index-card .symbol-row { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.index-card .symbol { font-size: 11px; color: var(--text-tertiary); }
+.index-card .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+.index-card .price {
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+.index-card .change-line {
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 8px;
+}
+.index-card .sparkline-wrap {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  height: 36px;
+}
+.index-card .region-tag {
+  font-size: 9px;
+  line-height: 1.4;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
-th.sortable:hover {
-  background-color: rgba(148, 163, 184, 0.08);
+/* ===== Commodities / FX ===== */
+.commodities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+.commodity-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+.commodity-card:hover { border-color: var(--border-hover); }
+.commodity-card .name { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+.commodity-card .value-group { text-align: right; }
+.commodity-card .value { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.commodity-card .change { font-size: 11px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+/* ===== Fund Table ===== */
+.fund-table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  overflow-x: auto;
+}
+.fund-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.fund-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.fund-table th.sortable { cursor: pointer; user-select: none; }
+.fund-table th.sortable:hover { color: var(--text-secondary); }
+.fund-table th.sortable.active { color: var(--text-primary); }
+.fund-table th.sortable .sort-arrow { opacity: 0.35; margin-left: 4px; font-size: 10px; }
+.fund-table th.sortable.active .sort-arrow { opacity: 1; }
+.fund-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.fund-table tr:last-child td { border-bottom: none; }
+.fund-table tbody tr:hover td { background: var(--surface-hover); }
+.fund-table .stock-name { font-weight: 500; }
+.fund-table .stock-code { font-size: 12px; color: var(--text-tertiary); }
+.fund-table .num { font-variant-numeric: tabular-nums; text-align: right; font-family: var(--font-mono); }
+.fund-table th.num { text-align: right; font-family: var(--font-sans); }
+
+/* ===== Colors ===== */
+.text-rise, .up { color: var(--positive); }
+.text-fall, .down { color: var(--danger); }
+.text-flat, .neutral { color: var(--text-tertiary); }
+.bg-up { background: var(--positive-bg); }
+.bg-down { background: var(--danger-bg); }
+.bg-flat { background: var(--surface-hover); }
+
+/* ===== Loading & Toast ===== */
+.loading-text {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  grid-column: 1 / -1;
 }
 
-th.sortable.active {
-  color: #f1f5f9;
-}
-
-/* 3. 스피너 animation */
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.spinner {
-  animation: spin 1s linear infinite;
-  border-radius: 50%;
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-/* 4. 토스트 fade in/out transition */
 .toast {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 50;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
   transition: opacity 0.3s ease, transform 0.3s ease;
   opacity: 1;
   transform: translateY(0);
 }
+.toast.hidden { display: none; }
 
-.toast.hidden {
-  display: none;
+/* ===== Animations ===== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
+.fade-in { animation: fadeIn 0.4s ease forwards; }
 
-.toast-enter {
-  opacity: 0;
-  transform: translateY(8px);
-}
-
-/* 5. 가로 스크롤바 숨기기 */
-.hide-scrollbar {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
-}
-
-.hide-scrollbar::-webkit-scrollbar {
-  display: none; /* Chrome/Safari */
-}
-
-/* 6. pre-wrap 텍스트 스타일 */
-.report-text {
-  white-space: pre-wrap;
-  line-height: 1.8;
-  word-break: break-word;
-}
-
-/* 7. 장 상태 뱃지 점멸 (개장중) */
 @keyframes blink {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  50% { opacity: 0.35; }
+}
+.blink { animation: blink 1.5s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in, .blink { animation: none; }
+  .index-card:hover { transform: none; }
 }
 
-.blink {
-  animation: blink 1.5s ease-in-out infinite;
-}
-
-/* 지수 카드 기본 스타일 */
-.index-card {
-  min-width: 180px;
-  background-color: #1e293b;
-  border-radius: 0.75rem;
-  padding: 1rem;
-  flex-shrink: 0;
-  transition: background-color 0.15s ease;
-}
-
-.index-card:hover {
-  background-color: #263348;
-}
-
-/* 환율/유가 카드 */
-.fx-oil-card {
-  background-color: #1e293b;
-  border-radius: 0.75rem;
-  padding: 1rem;
-  transition: background-color 0.15s ease;
-}
-
-.fx-oil-card:hover {
-  background-color: #263348;
-}
-
-/* 종목 테이블 행 */
-#stocks-tbody tr {
-  border-bottom: 1px solid rgba(51, 65, 85, 0.6);
-  transition: background-color 0.1s ease;
-}
-
-#stocks-tbody tr:last-child {
-  border-bottom: none;
-}
-
-#stocks-tbody tr:hover {
-  background-color: rgba(148, 163, 184, 0.05);
-}
-
-/* 색상 유틸 */
-.text-rise {
-  color: #22c55e;
-}
-
-.text-fall {
-  color: #ef4444;
-}
-
-.text-flat {
-  color: #94a3b8;
+/* ===== Responsive ===== */
+@media (max-width: 640px) {
+  .indices-grid { grid-template-columns: 1fr; }
+  .commodities-grid { grid-template-columns: repeat(2, 1fr); }
+  .header { flex-direction: column; }
+  .world-clock { font-size: 12px; gap: 10px; }
 }
